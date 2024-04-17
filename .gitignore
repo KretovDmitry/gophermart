@@ -12,8 +12,8 @@
 *.out
 
 # Binaries
-cmd/gophermart/main
-cmd/gophermart/gophermart
+cmd/accrual
+cmd/gophermart/server
 
 # Dependency directories (remove the comment below to include it)
 vendor/
@@ -21,3 +21,12 @@ vendor/
 # IDEs directories
 .idea
 .vscode
+
+# Log files
+*.log
+
+# pid file
+.pid
+
+# data
+testdata/postgres
