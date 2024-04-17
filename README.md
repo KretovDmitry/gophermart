@@ -1,4 +1,4 @@
-# Go RESTful API points accumulation service for Gophermart ⭐⭐⭐⭐⭐ 
+# Go RESTful API loyalty service for Gophermart ⭐⭐⭐⭐⭐ 
 
 
 ## Начало

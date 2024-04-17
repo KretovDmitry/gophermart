@@ -12,7 +12,6 @@
 *.out
 
 # Binaries
-cmd/accrual
 cmd/gophermart/server
 
 # Dependency directories (remove the comment below to include it)

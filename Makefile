@@ -7,8 +7,6 @@ CONFIG_FILE ?= ./config/local.yml
 APP_DSN ?= $(shell sed -n 's/^dsn:[[:space:]]*"\(.*\)"/\1/p' $(CONFIG_FILE))
 MIGRATE := docker run -v $(shell pwd)/migrations:/migrations \
 		   --network host migrate/migrate:v4.17.0 -path=/migrations/ -database "$(APP_DSN)"
-SQLC_AUTH_TOKEN ?= $(shell sed -n 's/^sqlc_auth_token:[[:space:]]*"\(.*\)"/\1/p' $(CONFIG_FILE))
-SQLC := docker run --rm -v $(shell pwd):/src -w /src -e $(SQLC_AUTH_TOKEN) sqlc/sqlc
 
 PID_FILE := './.pid'
 FSWATCH_FILE := './fswatch.cfg'
@@ -75,28 +73,6 @@ db-start: ## start the database server
 .PHONY: db-stop
 db-stop: ## stop the database server
 	docker stop postgres
-
-.PHONY: redis-start
-redis-start: ## start the redis server
-	@mkdir -p testdata/redis
-	docker run --rm --name redis -v $(shell pwd)/testdata/redis:/data -d -p 6379:6379 redis
-
-.PHONY: redis-stop
-redis-stop: ## stop the redis server
-	docker stop redis
-
-.PHONY: sqlc-generate
-sqlc-generate: ## generate Go code that presents type-safe interfaces to service queries
-	$(SQLC) generate
-
-.PHONY: sqlc-vet
-sqlc-vet: ## run query analyzer on cloud hosted database
-	$(SQLC) vet
-
-.PHONY: sqlc-verify
-sqlc-verify: ## verify schema changes
-	$(SQLC) push --tag main
-	$(SQLC) verify --against main
 
 .PHONY: testdata
 testdata: ## populate the database with test data
