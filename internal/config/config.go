@@ -17,9 +17,11 @@ type (
 		// The address of the accural system server.
 		AccrualAddr string `yaml:"accrual_addr" env:"ACCRUAL_SYSTEM_ADDRESS"`
 		// Subconfigs.
-		HTTPServer `yaml:"http_server"`
-		Logger     `yaml:"logger"`
-		JWT        `yaml:"jwt"`
+		HTTPServer HTTPServer `yaml:"http_server"`
+		JWT        JWT        `yaml:"jwt"`
+		Logger     Logger     `yaml:"logger"`
+		// Cost of the password to hash. Must be grater than 3.
+		PasswordHashCost int `yaml:"password_hash_cost" env-default:"14"`
 	}
 	// Config for HTTP server.
 	HTTPServer struct {
