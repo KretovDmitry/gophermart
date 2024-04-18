@@ -53,7 +53,7 @@ func (s *Service) Register(w http.ResponseWriter, r *http.Request, params Regist
 	}
 
 	// Build authentication token.
-	authToken, err := jwt.BuildString(id, s.config.SigningKey, s.config.Expiration)
+	authToken, err := jwt.BuildString(id, s.config.JWT.SigningKey, s.config.JWT.Expiration)
 	if err != nil {
 		ErrorHandlerFunc(w, r, err)
 		return
@@ -63,7 +63,7 @@ func (s *Service) Register(w http.ResponseWriter, r *http.Request, params Regist
 	http.SetCookie(w, &http.Cookie{
 		Name:     "Authorization",
 		Value:    authToken,
-		Expires:  time.Now().Add(s.config.Expiration),
+		Expires:  time.Now().Add(s.config.JWT.Expiration),
 		HttpOnly: true,
 	})
 
@@ -86,7 +86,7 @@ func (s *Service) Login(w http.ResponseWriter, r *http.Request, params LoginPara
 	}
 
 	// Build authentication token.
-	authToken, err := jwt.BuildString(u.ID, s.config.SigningKey, s.config.Expiration)
+	authToken, err := jwt.BuildString(u.ID, s.config.JWT.SigningKey, s.config.JWT.Expiration)
 	if err != nil {
 		ErrorHandlerFunc(w, r, err)
 		return
@@ -96,7 +96,7 @@ func (s *Service) Login(w http.ResponseWriter, r *http.Request, params LoginPara
 	http.SetCookie(w, &http.Cookie{
 		Name:     "Authorization",
 		Value:    authToken,
-		Expires:  time.Now().Add(s.config.Expiration),
+		Expires:  time.Now().Add(s.config.JWT.Expiration),
 		HttpOnly: true,
 	})
 
@@ -119,7 +119,7 @@ func (s *Service) Middleware(next http.Handler) http.Handler {
 			return
 		}
 
-		userID, err := jwt.GetUserID(authCookie.Value, s.config.SigningKey)
+		userID, err := jwt.GetUserID(authCookie.Value, s.config.JWT.SigningKey)
 		if err != nil {
 			ErrorHandlerFunc(w, r,
 				&appErrors.InvalidAuthorizationError{Message: err.Error()})
