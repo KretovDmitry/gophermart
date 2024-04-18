@@ -5,7 +5,7 @@ import (
 	"io"
 	"net/http"
 
-	appErrors "github.com/KretovDmitry/gophermart-loyalty-service/internal/models/errors"
+	"github.com/KretovDmitry/gophermart-loyalty-service/internal/models/errs"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -47,21 +47,23 @@ func (siw *ServerInterfaceWrapper) Register(w http.ResponseWriter, r *http.Reque
 	// Parameter object where we will unmarshal all parameters from the context.
 	var params RegisterParams
 
+	defer r.Body.Close()
 	data, err := io.ReadAll(r.Body)
 	if err != nil {
 		siw.ErrorHandlerFunc(w, r, err)
+		return
 	}
-	r.Body.Close()
 
 	if err = json.Unmarshal(data, &params); err != nil {
 		siw.ErrorHandlerFunc(w, r, err)
+		return
 	}
 
 	// ------------- Required JSON body parameter "login" -------------
 
 	if params.Login == "" {
 		siw.ErrorHandlerFunc(w, r,
-			&appErrors.RequiredJSONBodyParamError{ParamName: "login"})
+			&errs.RequiredJSONBodyParamError{ParamName: "login"})
 		return
 	}
 
@@ -69,7 +71,7 @@ func (siw *ServerInterfaceWrapper) Register(w http.ResponseWriter, r *http.Reque
 
 	if params.Password == "" {
 		siw.ErrorHandlerFunc(w, r,
-			&appErrors.RequiredJSONBodyParamError{ParamName: "password"})
+			&errs.RequiredJSONBodyParamError{ParamName: "password"})
 		return
 	}
 
@@ -107,7 +109,7 @@ func (siw *ServerInterfaceWrapper) Login(w http.ResponseWriter, r *http.Request)
 
 	if params.Login == "" {
 		siw.ErrorHandlerFunc(w, r,
-			&appErrors.RequiredJSONBodyParamError{ParamName: "login"})
+			&errs.RequiredJSONBodyParamError{ParamName: "login"})
 		return
 	}
 
@@ -115,7 +117,7 @@ func (siw *ServerInterfaceWrapper) Login(w http.ResponseWriter, r *http.Request)
 
 	if params.Password == "" {
 		siw.ErrorHandlerFunc(w, r,
-			&appErrors.RequiredJSONBodyParamError{ParamName: "password"})
+			&errs.RequiredJSONBodyParamError{ParamName: "password"})
 		return
 	}
 

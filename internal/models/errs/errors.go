@@ -1,21 +1,25 @@
-package errors
+package errs
 
 import (
 	"errors"
 	"fmt"
 )
 
+// Common sentinel errors.
 var (
-	ErrNotFound = errors.New("not found")
-	ErrConflict = errors.New("data conflict")
+	ErrNotFound        = errors.New("not found")
+	ErrConflict        = errors.New("data conflict")
+	ErrRateLimit       = errors.New("rate limit")
+	ErrInvalidPassword = errors.New("invalid password")
 )
 
 // Type just for murshallig purpose.
+// Should only be used immediately before marshalling.
 type JSON struct {
-	Err string `json:"error"`
+	Error string `json:"error"`
 }
 
-// Let users know which required requests parameter is not provided.
+// Let users know which required request parameter is not provided.
 type RequiredJSONBodyParamError struct {
 	ParamName string
 }

@@ -3,13 +3,14 @@ package auth
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"time"
 
 	"github.com/KretovDmitry/gophermart-loyalty-service/internal/config"
 	"github.com/KretovDmitry/gophermart-loyalty-service/internal/jwt"
-	appErrors "github.com/KretovDmitry/gophermart-loyalty-service/internal/models/errors"
+	"github.com/KretovDmitry/gophermart-loyalty-service/internal/models/errs"
 	"github.com/KretovDmitry/gophermart-loyalty-service/internal/models/user"
 	"github.com/KretovDmitry/gophermart-loyalty-service/pkg/logger"
 	"golang.org/x/crypto/bcrypt"
@@ -36,9 +37,11 @@ func (s *Service) Register(w http.ResponseWriter, r *http.Request, params Regist
 	hashPassword, err := bcrypt.GenerateFromPassword([]byte(params.Password), s.config.PasswordHashCost)
 	if err != nil {
 		if errors.Is(err, bcrypt.ErrPasswordTooLong) {
-			ErrorHandlerFunc(w, r, &appErrors.InvalidPasswordError{
-				Message: "the password must not exceed 72 characters in length",
-			})
+			ErrorHandlerFunc(w, r,
+				fmt.Errorf(
+					"%w: must not exceed 72 characters in length",
+					errs.ErrInvalidPassword),
+			)
 			return
 		}
 		ErrorHandlerFunc(w, r, err)
@@ -48,6 +51,7 @@ func (s *Service) Register(w http.ResponseWriter, r *http.Request, params Regist
 	// Create user.
 	id, err := s.repo.CreateUser(r.Context(), params.Login, string(hashPassword))
 	if err != nil {
+		// TODO: SENTINEL errors.Is
 		ErrorHandlerFunc(w, r, err)
 		return
 	}
@@ -109,10 +113,7 @@ func (s *Service) Middleware(next http.Handler) http.Handler {
 		authCookie, err := r.Cookie("Authorization")
 		if err != nil {
 			if errors.Is(err, http.ErrNoCookie) {
-				ErrorHandlerFunc(w, r,
-					&appErrors.InvalidAuthorizationError{
-						Message: "authorization cookie is not provided",
-					})
+				ErrorHandlerFunc(w, r, fmt.Errorf("%w: Authorization", http.ErrNoCookie))
 				return
 			}
 			ErrorHandlerFunc(w, r, err)
@@ -122,17 +123,14 @@ func (s *Service) Middleware(next http.Handler) http.Handler {
 		userID, err := jwt.GetUserID(authCookie.Value, s.config.JWT.SigningKey)
 		if err != nil {
 			ErrorHandlerFunc(w, r,
-				&appErrors.InvalidAuthorizationError{Message: err.Error()})
+				&errs.InvalidAuthorizationError{Message: err.Error()})
 			return
 		}
 
 		u, err := s.repo.GetUserByID(r.Context(), userID)
 		if err != nil {
-			if errors.Is(err, appErrors.ErrNotFound) {
-				ErrorHandlerFunc(w, r,
-					&appErrors.InvalidAuthorizationError{
-						Message: "no such user",
-					})
+			if errors.Is(err, errs.ErrNotFound) {
+				ErrorHandlerFunc(w, r, fmt.Errorf("%w: user id: %d", errs.ErrNotFound, userID))
 				return
 			}
 			ErrorHandlerFunc(w, r, err)
@@ -147,19 +145,31 @@ func (s *Service) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(f)
 }
 
-// ErrorHandlerFunc wraps sending of an error in the Error format, and
-// handling the failure to marshal that.
+// ErrorHandlerFunc handles sending of an error in the JSON format,
+// writing appropriate status code and handling the failure to marshal that.
 func ErrorHandlerFunc(w http.ResponseWriter, _ *http.Request, err error) {
-	appError := appErrors.JSON{Err: err.Error()}
+	appError := errs.JSON{Error: err.Error()}
 	code := http.StatusInternalServerError
 
 	switch err.(type) {
-	case *appErrors.RequiredJSONBodyParamError:
+	case *errs.RequiredJSONBodyParamError:
 		code = http.StatusBadRequest
-	case *appErrors.InvalidAuthorizationError:
+	case *errs.InvalidAuthorizationError:
 		code = http.StatusUnauthorized
-	case *appErrors.AlreadyExistsError:
+	case *errs.AlreadyExistsError:
 		code = http.StatusConflict
+	}
+
+	switch {
+	// Status Unauthorized.
+	case errors.Is(err, errs.ErrNotFound):
+		code = http.StatusUnauthorized
+	case errors.Is(err, http.ErrNoCookie):
+		code = http.StatusUnauthorized
+
+	// Status Bad Request.
+	case errors.Is(err, errs.ErrInvalidPassword):
+
 	}
 
 	// Empty body.

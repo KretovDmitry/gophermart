@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"errors"
 
-	appErrors "github.com/KretovDmitry/gophermart-loyalty-service/internal/models/errors"
+	"github.com/KretovDmitry/gophermart-loyalty-service/internal/models/errs"
 	"github.com/KretovDmitry/gophermart-loyalty-service/internal/models/user"
 	"github.com/KretovDmitry/gophermart-loyalty-service/pkg/logger"
 	"github.com/jackc/pgconn"
@@ -61,7 +61,7 @@ func (r *repository) GetUserByID(ctx context.Context, userID int) (*user.User, e
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, appErrors.ErrNotFound
+			return nil, errs.ErrNotFound
 		}
 		return nil, err
 	}
@@ -122,7 +122,7 @@ func (r *repository) CreateUser(ctx context.Context, login, password string) (in
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) {
 			if pgErr.Code == pgerrcode.UniqueViolation {
-				return 0, &appErrors.AlreadyExistsError{
+				return 0, &errs.AlreadyExistsError{
 					FieldName: pgErr.ColumnName,
 				}
 			}
