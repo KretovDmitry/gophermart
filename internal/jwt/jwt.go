@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/KretovDmitry/gophermart-loyalty-service/internal/models/claims"
+	"github.com/KretovDmitry/gophermart-loyalty-service/internal/models/errs"
 	"github.com/golang-jwt/jwt/v4"
 )
 
@@ -38,7 +39,8 @@ func GetUserID(tokenString, secret string) (int, error) {
 			// Verify that the token method is HS256
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return 0, fmt.Errorf(
-					"unexpected signing method: %v", token.Header["alg"],
+					"%w: unexpected signing method: %v",
+					errs.ErrInvalidCredentials, token.Header["alg"],
 				)
 			}
 
@@ -52,7 +54,7 @@ func GetUserID(tokenString, secret string) (int, error) {
 
 	// Check if the token is valid
 	if !token.Valid {
-		return 0, fmt.Errorf("invalid token: %w", err)
+		return 0, fmt.Errorf("%w: %w", errs.ErrInvalidCredentials, err)
 	}
 
 	// Return the user ID

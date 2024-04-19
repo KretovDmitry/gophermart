@@ -2,6 +2,7 @@ package auth
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 
@@ -40,11 +41,6 @@ type MiddlewareFunc func(http.Handler) http.Handler
 
 // Register operation middleware.
 func (siw *ServerInterfaceWrapper) Register(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	var err error
-
-	// Parameter object where we will unmarshal all parameters from the context.
 	var params RegisterParams
 
 	defer r.Body.Close()
@@ -62,16 +58,14 @@ func (siw *ServerInterfaceWrapper) Register(w http.ResponseWriter, r *http.Reque
 	// ------------- Required JSON body parameter "login" -------------
 
 	if params.Login == "" {
-		siw.ErrorHandlerFunc(w, r,
-			&errs.RequiredJSONBodyParamError{ParamName: "login"})
+		siw.ErrorHandlerFunc(w, r, fmt.Errorf("%w: login", errs.ErrRequiredJSONBodyParam))
 		return
 	}
 
 	// ------------- Required JSON body parameter "password" ----------
 
 	if params.Password == "" {
-		siw.ErrorHandlerFunc(w, r,
-			&errs.RequiredJSONBodyParamError{ParamName: "password"})
+		siw.ErrorHandlerFunc(w, r, fmt.Errorf("%w: password", errs.ErrRequiredJSONBodyParam))
 		return
 	}
 
@@ -83,16 +77,11 @@ func (siw *ServerInterfaceWrapper) Register(w http.ResponseWriter, r *http.Reque
 		handler = middleware(handler)
 	}
 
-	handler.ServeHTTP(w, r.WithContext(ctx))
+	handler.ServeHTTP(w, r)
 }
 
 // Login operation middleware.
 func (siw *ServerInterfaceWrapper) Login(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	var err error
-
-	// Parameter object where we will unmarshal all parameters from the context.
 	var params LoginParams
 
 	data, err := io.ReadAll(r.Body)
@@ -108,16 +97,14 @@ func (siw *ServerInterfaceWrapper) Login(w http.ResponseWriter, r *http.Request)
 	// ------------- Required JSON body parameter "login" -------------
 
 	if params.Login == "" {
-		siw.ErrorHandlerFunc(w, r,
-			&errs.RequiredJSONBodyParamError{ParamName: "login"})
+		siw.ErrorHandlerFunc(w, r, fmt.Errorf("%w: login", errs.ErrRequiredJSONBodyParam))
 		return
 	}
 
 	// ------------- Required JSON body parameter "password" ----------
 
 	if params.Password == "" {
-		siw.ErrorHandlerFunc(w, r,
-			&errs.RequiredJSONBodyParamError{ParamName: "password"})
+		siw.ErrorHandlerFunc(w, r, fmt.Errorf("%w: password", errs.ErrRequiredJSONBodyParam))
 		return
 	}
 
@@ -129,7 +116,7 @@ func (siw *ServerInterfaceWrapper) Login(w http.ResponseWriter, r *http.Request)
 		handler = middleware(handler)
 	}
 
-	handler.ServeHTTP(w, r.WithContext(ctx))
+	handler.ServeHTTP(w, r)
 }
 
 // Handler creates http.Handler with routing matching spec.
@@ -166,7 +153,7 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r = chi.NewRouter()
 	}
 	if options.ErrorHandlerFunc == nil {
-		options.ErrorHandlerFunc = func(w http.ResponseWriter, r *http.Request, err error) {
+		options.ErrorHandlerFunc = func(w http.ResponseWriter, _ *http.Request, err error) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		}
 	}

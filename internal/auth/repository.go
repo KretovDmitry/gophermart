@@ -93,6 +93,9 @@ func (r *repository) GetUserByLogin(ctx context.Context, login string) (*user.Us
 		&u.UpdatedAt,
 	)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errs.ErrNotFound
+		}
 		return nil, err
 	}
 
@@ -122,12 +125,10 @@ func (r *repository) CreateUser(ctx context.Context, login, password string) (in
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) {
 			if pgErr.Code == pgerrcode.UniqueViolation {
-				return 0, &errs.AlreadyExistsError{
-					FieldName: pgErr.ColumnName,
-				}
+				return -1, errs.ErrConflict
 			}
 		}
-		return 0, err
+		return -1, err
 	}
 
 	return id, nil
