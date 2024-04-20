@@ -4,12 +4,15 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/KretovDmitry/gophermart-loyalty-service/internal/auth"
 	"github.com/KretovDmitry/gophermart-loyalty-service/internal/config"
 	"github.com/KretovDmitry/gophermart-loyalty-service/pkg/logger"
 	"github.com/go-chi/chi/v5"
@@ -22,8 +25,15 @@ import (
 var Version = "1.0.0"
 
 func main() {
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func run() error {
 	// Server run context.
 	serverCtx, serverStopCtx := context.WithCancel(context.Background())
+	defer serverStopCtx()
 
 	// Load application configurations.
 	cfg := config.MustLoad()
@@ -33,8 +43,7 @@ func main() {
 
 	db, err := sql.Open("pgx", cfg.DSN)
 	if err != nil {
-		logger.Errorf("failed to open the database: %s", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to open the database: %w", err)
 	}
 
 	// Log every query to the database.
@@ -42,8 +51,7 @@ func main() {
 
 	// Check connectivity and DSN correctness.
 	if err = db.Ping(); err != nil {
-		logger.Errorf("failed to connect to the database: %s", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to connect to the database: %w", err)
 	}
 
 	// Close connection.
@@ -51,7 +59,7 @@ func main() {
 		if err = db.Close(); err != nil {
 			logger.Error(err)
 		}
-		logger.Sync()
+		_ = logger.Sync()
 	}()
 
 	// // Init repository for banner service
@@ -70,48 +78,48 @@ func main() {
 	// // Do not loose banners being asynchronously deleted
 	// defer bannerService.Stop()
 	//
-	// // Init repository for auth service
-	// authRepo, err := auth.NewRepository(db, logger)
-	// if err != nil {
-	// 	logger.Errorf("failed to create auth repository: %s", err)
-	// 	os.Exit(1)
-	// }
-	//
-	// authService, err := auth.NewService(authRepo, logger, cfg)
-	// if err != nil {
-	// 	logger.Error("failed to init auth service")
-	// 	os.Exit(1)
-	// }
+	// Init repository for auth service
+	authRepo, err := auth.NewRepository(db, logger)
+	if err != nil {
+		return fmt.Errorf("failed to create auth repository: %w", err)
+	}
+
+	authService, err := auth.NewService(authRepo, logger, cfg)
+	if err != nil {
+		return fmt.Errorf("failed to init auth service: %w", err)
+	}
 
 	router := chi.NewRouter()
 	router.Use(middleware.Logger)
 	router.Use(middleware.Recoverer)
 
-	// handler := banner.HandlerWithOptions(bannerService, banner.ChiServerOptions{
-	// 	BaseRouter:       router,
-	// 	ErrorHandlerFunc: banner.ErrorHandlerFunc,
-	// })
+	handler := auth.HandlerWithOptions(authService, auth.ChiServerOptions{
+		BaseURL:          "/api/user",
+		BaseRouter:       router,
+		ErrorHandlerFunc: auth.ErrorHandlerFunc,
+	})
 
 	// Build HTTP server.
 	hs := &http.Server{
 		Addr:              cfg.HTTPServer.Address,
 		ReadHeaderTimeout: cfg.HTTPServer.Timeout,
 		IdleTimeout:       cfg.HTTPServer.IdleTimeout,
-		// Handler: handler,
+		Handler:           handler,
 	}
 
 	// Graceful shutdown.
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGHUP, syscall.SIGINT,
-		syscall.SIGTERM, syscall.SIGQUIT, os.Interrupt)
 	go func() {
+		sig := make(chan os.Signal, 1)
+		signal.Notify(sig, syscall.SIGHUP, syscall.SIGINT,
+			syscall.SIGTERM, syscall.SIGQUIT, os.Interrupt)
+
 		<-sig
 
-		logger.Infof("shutting down server with %s timeout",
+		logger.Infof("Shutting down server with %s timeout",
 			cfg.HTTPServer.ShutdownTimeout)
 
 		if err = hs.Shutdown(serverCtx); err != nil {
-			logger.Errorf("graceful shutdown failed: %v", err)
+			logger.Errorf("graceful shutdown failed: %w", err)
 		}
 		serverStopCtx()
 	}()
@@ -119,13 +127,15 @@ func main() {
 	// Start the HTTP server with graceful shutdown.
 	logger.Infof("server %v is running at %v", Version, cfg.HTTPServer.Address)
 	if err = hs.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		logger.Errorf("run server failed: %v", err)
+		return fmt.Errorf("run server failed: %w", err)
 	}
 
 	// Wait for server context to be stopped.
 	select {
 	case <-serverCtx.Done():
 	case <-time.After(cfg.HTTPServer.ShutdownTimeout):
-		logger.Error("graceful shutdown timed out.. forcing exit")
+		return errors.New("graceful shutdown timed out.. forcing exit")
 	}
+
+	return nil
 }

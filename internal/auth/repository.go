@@ -8,8 +8,8 @@ import (
 	"github.com/KretovDmitry/gophermart-loyalty-service/internal/models/errs"
 	"github.com/KretovDmitry/gophermart-loyalty-service/internal/models/user"
 	"github.com/KretovDmitry/gophermart-loyalty-service/pkg/logger"
-	"github.com/jackc/pgconn"
 	"github.com/jackc/pgerrcode"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 type Repository interface {
@@ -37,18 +37,7 @@ func NewRepository(db *sql.DB, logger logger.Logger) (*repository, error) {
 var _ Repository = (*repository)(nil)
 
 func (r *repository) GetUserByID(ctx context.Context, userID int) (*user.User, error) {
-	const query = `
-		SELECT
-			id,
-			login,
-			password,
-			created_at,
-			updated_at
-		FROM
-			users
-		WHERE
-			id = $1
-	`
+	const query = "SELECT * FROM users WHERE id = $1"
 
 	u := new(user.User)
 
@@ -70,18 +59,7 @@ func (r *repository) GetUserByID(ctx context.Context, userID int) (*user.User, e
 }
 
 func (r *repository) GetUserByLogin(ctx context.Context, login string) (*user.User, error) {
-	const query = `
-		SELECT 
-			id,
-			login,
-			password,
-			created_at,
-			updated_at
-		FROM 
-			users
-		WHERE 
-			login = $1
-	`
+	const query = "SELECT * FROM users WHERE login = $1"
 
 	u := new(user.User)
 
@@ -103,20 +81,7 @@ func (r *repository) GetUserByLogin(ctx context.Context, login string) (*user.Us
 }
 
 func (r *repository) CreateUser(ctx context.Context, login, password string) (int, error) {
-	const query = `
-		INSERT INTO TABLE users 
-		(
-			login,
-			password
-		)
-		VALUES 
-		(
-			$1,
-			$2
-		)
-		RETURNING 
-			id
-	`
+	const query = "INSERT INTO users (login, password) VALUES ($1, $2) RETURNING id"
 
 	var id int
 
@@ -124,6 +89,7 @@ func (r *repository) CreateUser(ctx context.Context, login, password string) (in
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) {
+			r.logger.Errorf("%v", pgErr.Code)
 			if pgErr.Code == pgerrcode.UniqueViolation {
 				return -1, errs.ErrConflict
 			}

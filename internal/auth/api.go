@@ -2,9 +2,10 @@ package auth
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
-	"io"
 	"net/http"
+	"strings"
 
 	"github.com/KretovDmitry/gophermart-loyalty-service/internal/models/errs"
 	"github.com/go-chi/chi/v5"
@@ -39,18 +40,32 @@ type ServerInterfaceWrapper struct {
 
 type MiddlewareFunc func(http.Handler) http.Handler
 
+const MaxPasswordLength = 72
+
 // Register operation middleware.
 func (siw *ServerInterfaceWrapper) Register(w http.ResponseWriter, r *http.Request) {
-	var params RegisterParams
+	// ------------- Required JSON content type -----------------------
 
-	defer r.Body.Close()
-	data, err := io.ReadAll(r.Body)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, err)
+	contentType := r.Header.Get("Content-Type")
+	if strings.ToLower(strings.TrimSpace(contentType)) != "application/json" {
+		siw.ErrorHandlerFunc(w, r, fmt.Errorf("%w: %s", errs.ErrContentType, contentType))
 		return
 	}
 
-	if err = json.Unmarshal(data, &params); err != nil {
+	// Decode request body params.
+	var params RegisterParams
+
+	defer r.Body.Close()
+
+	if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
+		var e *json.UnmarshalTypeError
+		if errors.As(err, &e) {
+			siw.ErrorHandlerFunc(w, r, fmt.Errorf(
+				"%w: %s must be of type %s, got %s",
+				errs.ErrInvalidPayload, e.Field, e.Type, e.Value),
+			)
+			return
+		}
 		siw.ErrorHandlerFunc(w, r, err)
 		return
 	}
@@ -69,6 +84,14 @@ func (siw *ServerInterfaceWrapper) Register(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	// Password must not exceed 72 characters in length [bcrypt.ErrPasswordTooLong]
+	if len(params.Password) > MaxPasswordLength {
+		ErrorHandlerFunc(w, r, fmt.Errorf(
+			"%w: password must not exceed 72 characters in length",
+			errs.ErrInvalidPayload))
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.Register(w, r, params)
 	}))
@@ -82,16 +105,30 @@ func (siw *ServerInterfaceWrapper) Register(w http.ResponseWriter, r *http.Reque
 
 // Login operation middleware.
 func (siw *ServerInterfaceWrapper) Login(w http.ResponseWriter, r *http.Request) {
+	// ------------- Required JSON content type -----------------------
+
+	contentType := r.Header.Get("Content-Type")
+	if strings.ToLower(strings.TrimSpace(contentType)) != "application/json" {
+		siw.ErrorHandlerFunc(w, r, fmt.Errorf("%w: %s", errs.ErrContentType, contentType))
+		return
+	}
+
+	// Decode request body params.
 	var params LoginParams
 
-	data, err := io.ReadAll(r.Body)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, err)
-	}
-	r.Body.Close()
+	defer r.Body.Close()
 
-	if err = json.Unmarshal(data, &params); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
+		var e *json.UnmarshalTypeError
+		if errors.As(err, &e) {
+			siw.ErrorHandlerFunc(w, r, fmt.Errorf(
+				"%w: %s must be of type %s, got %s",
+				errs.ErrInvalidPayload, e.Field, e.Type, e.Value),
+			)
+			return
+		}
 		siw.ErrorHandlerFunc(w, r, err)
+		return
 	}
 
 	// ------------- Required JSON body parameter "login" -------------

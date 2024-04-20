@@ -29,7 +29,7 @@ test: ## run unit tests
 
 .PHONY: test-cover
 test-cover: test ## run unit tests and show test coverage information
-	go tool cover -html=coverage-all.out
+	go tool cover -html=coverage-all.out -o coverage.html
 
 .PHONY: run
 run: ## run the API server
@@ -45,7 +45,7 @@ run-restart: ## restart the API server
 
 run-live: ## run the API server with live reload support (requires fswatch)
 	@go run ${LDFLAGS} cmd/server/main.go & echo $$! > $(PID_FILE)
-	@fswatch -x -o --event Created --event Updated --event Renamed -r internal pkg cmd config | xargs -n1 -I {} make run-restart
+	@fswatch -x -o --event Created --event Updated --event Renamed -r internal pkg cmd config | xargs -I {} make run-restart
 
 .PHONY: build
 build:  ## build the API server binary
@@ -57,7 +57,7 @@ build-docker: ## build the API server as a docker image
 
 .PHONY: clean
 clean: ## remove temporary files
-	rm -rf server coverage.out coverage-all.out
+	rm -rf server coverage.out coverage-all.out coverage.html
 
 .PHONY: version
 version: ## display the version of the API server
@@ -79,6 +79,10 @@ testdata: ## populate the database with test data
 	make migrate-reset
 	@echo "Populating test data..."
 	@docker exec -it postgres psql "$(APP_DSN)" -f /testdata/testdata.sql
+
+.PHONY: psql
+psql: ## run psql inside postgres container
+	@docker exec -it postgres psql "$(APP_DSN)"
 
 .PHONY: lint
 lint: ## run golangchi lint on all Go package

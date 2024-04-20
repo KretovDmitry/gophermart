@@ -36,12 +36,6 @@ func (s *Service) Register(w http.ResponseWriter, r *http.Request, params Regist
 	// Careate password hash.
 	hashPassword, err := bcrypt.GenerateFromPassword([]byte(params.Password), s.config.PasswordHashCost)
 	if err != nil {
-		if errors.Is(err, bcrypt.ErrPasswordTooLong) {
-			ErrorHandlerFunc(w, r, fmt.Errorf(
-				"%w: password must not exceed 72 characters in length",
-				errs.ErrInvalidPayload))
-			return
-		}
 		ErrorHandlerFunc(w, r, fmt.Errorf("hash password: %w", err))
 		return
 	}
@@ -51,6 +45,7 @@ func (s *Service) Register(w http.ResponseWriter, r *http.Request, params Regist
 	if err != nil {
 		if errors.Is(err, errs.ErrConflict) {
 			ErrorHandlerFunc(w, r, fmt.Errorf("%w: login %q already exists", err, params.Login))
+			return
 		}
 		ErrorHandlerFunc(w, r, fmt.Errorf("create user: %w", err))
 		return
@@ -79,6 +74,11 @@ func (s *Service) Login(w http.ResponseWriter, r *http.Request, params LoginPara
 	// Retrieve user from the database with provided login.
 	u, err := s.repo.GetUserByLogin(r.Context(), params.Login)
 	if err != nil {
+		if errors.Is(err, errs.ErrNotFound) {
+			ErrorHandlerFunc(w, r, fmt.Errorf("%w: user with login %q not found",
+				errs.ErrInvalidCredentials, params.Login))
+			return
+		}
 		ErrorHandlerFunc(w, r, fmt.Errorf("get user %q: %w", params.Login, err))
 		return
 	}
@@ -87,7 +87,8 @@ func (s *Service) Login(w http.ResponseWriter, r *http.Request, params LoginPara
 	err = bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(params.Password))
 	if err != nil {
 		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
-			ErrorHandlerFunc(w, r, fmt.Errorf("compare passwords: %w", errs.ErrInvalidCredentials))
+			ErrorHandlerFunc(w, r, fmt.Errorf("%w: password", errs.ErrInvalidCredentials))
+			return
 		}
 		ErrorHandlerFunc(w, r, fmt.Errorf("compare passwords: %w", err))
 		return
@@ -154,6 +155,7 @@ func ErrorHandlerFunc(w http.ResponseWriter, _ *http.Request, err error) {
 	// Status Bad Request.
 	case errors.Is(err, errs.ErrRequiredJSONBodyParam) ||
 		errors.Is(err, errs.ErrInvalidPayload) ||
+		errors.Is(err, errs.ErrContentType) ||
 		errors.Is(err, io.EOF):
 		code = http.StatusBadRequest
 
