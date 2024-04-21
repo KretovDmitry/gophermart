@@ -18,25 +18,25 @@ type Repository interface {
 	CreateUser(ctx context.Context, login, password string) (id int, err error)
 }
 
-type repository struct {
+type Repo struct {
 	db     *sql.DB
 	logger logger.Logger
 }
 
-func NewRepository(db *sql.DB, logger logger.Logger) (*repository, error) {
+func NewRepository(db *sql.DB, logger logger.Logger) (*Repo, error) {
 	if db == nil {
 		return nil, errors.New("nil dependency: database")
 	}
 
-	return &repository{
+	return &Repo{
 		db:     db,
 		logger: logger,
 	}, nil
 }
 
-var _ Repository = (*repository)(nil)
+var _ Repository = (*Repo)(nil)
 
-func (r *repository) GetUserByID(ctx context.Context, userID int) (*user.User, error) {
+func (r *Repo) GetUserByID(ctx context.Context, userID int) (*user.User, error) {
 	const query = "SELECT * FROM users WHERE id = $1"
 
 	u := new(user.User)
@@ -58,7 +58,7 @@ func (r *repository) GetUserByID(ctx context.Context, userID int) (*user.User, e
 	return u, nil
 }
 
-func (r *repository) GetUserByLogin(ctx context.Context, login string) (*user.User, error) {
+func (r *Repo) GetUserByLogin(ctx context.Context, login string) (*user.User, error) {
 	const query = "SELECT * FROM users WHERE login = $1"
 
 	u := new(user.User)
@@ -80,7 +80,7 @@ func (r *repository) GetUserByLogin(ctx context.Context, login string) (*user.Us
 	return u, nil
 }
 
-func (r *repository) CreateUser(ctx context.Context, login, password string) (int, error) {
+func (r *Repo) CreateUser(ctx context.Context, login, password string) (int, error) {
 	const query = "INSERT INTO users (login, password) VALUES ($1, $2) RETURNING id"
 
 	var id int
@@ -89,9 +89,8 @@ func (r *repository) CreateUser(ctx context.Context, login, password string) (in
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) {
-			r.logger.Errorf("%v", pgErr.Code)
 			if pgErr.Code == pgerrcode.UniqueViolation {
-				return -1, errs.ErrConflict
+				return -1, errs.ErrDataConflict
 			}
 		}
 		return -1, err

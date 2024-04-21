@@ -110,6 +110,6 @@ migrate-new: ## create a new database migration
 .PHONY: migrate-reset
 migrate-reset: ## reset database and re-run all migrations
 	@echo "Resetting database..."
-	@$(MIGRATE) drop -f
+	@$(MIGRATE) down 1
 	@echo "Running all database migrations..."
 	@$(MIGRATE) up

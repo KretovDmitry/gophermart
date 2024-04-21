@@ -6,13 +6,13 @@ import (
 
 // Common sentinel errors.
 var (
-	ErrNotFound              = errors.New("not found")
-	ErrConflict              = errors.New("data conflict")
-	ErrRateLimit             = errors.New("rate limit")
-	ErrContentType           = errors.New("invalid content type")
-	ErrInvalidPayload        = errors.New("invalid payload")
-	ErrRequiredJSONBodyParam = errors.New("JSON body argument is required, bot not found")
-	ErrInvalidCredentials    = errors.New("invalid credentials")
+	ErrNotFound           = errors.New("not found")
+	ErrRateLimit          = errors.New("rate limit")
+	ErrDataConflict       = errors.New("data conflict")
+	ErrInvalidPayload     = errors.New("invalid payload")
+	ErrRequiredBodyParam  = errors.New("body argument is required, bot not found")
+	ErrInvalidContentType = errors.New("invalid content type")
+	ErrInvalidCredentials = errors.New("invalid credentials")
 )
 
 // Type just for murshallig purpose.

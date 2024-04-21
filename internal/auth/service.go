@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"time"
 
@@ -43,7 +42,7 @@ func (s *Service) Register(w http.ResponseWriter, r *http.Request, params Regist
 	// Create user.
 	id, err := s.repo.CreateUser(r.Context(), params.Login, string(hashPassword))
 	if err != nil {
-		if errors.Is(err, errs.ErrConflict) {
+		if errors.Is(err, errs.ErrDataConflict) {
 			ErrorHandlerFunc(w, r, fmt.Errorf("%w: login %q already exists", err, params.Login))
 			return
 		}
@@ -153,10 +152,9 @@ func ErrorHandlerFunc(w http.ResponseWriter, _ *http.Request, err error) {
 
 	switch {
 	// Status Bad Request.
-	case errors.Is(err, errs.ErrRequiredJSONBodyParam) ||
+	case errors.Is(err, errs.ErrRequiredBodyParam) ||
 		errors.Is(err, errs.ErrInvalidPayload) ||
-		errors.Is(err, errs.ErrContentType) ||
-		errors.Is(err, io.EOF):
+		errors.Is(err, errs.ErrInvalidContentType):
 		code = http.StatusBadRequest
 
 	// Status Unauthorized.
@@ -165,7 +163,7 @@ func ErrorHandlerFunc(w http.ResponseWriter, _ *http.Request, err error) {
 		code = http.StatusUnauthorized
 
 	// Status Conflict.
-	case errors.Is(err, errs.ErrConflict):
+	case errors.Is(err, errs.ErrDataConflict):
 		code = http.StatusConflict
 	}
 

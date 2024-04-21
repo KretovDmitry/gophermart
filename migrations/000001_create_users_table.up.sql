@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS users (
+CREATE TABLE users (
     id serial PRIMARY KEY,
     login varchar(255) NOT NULL CONSTRAINT unique_login UNIQUE,
     password varchar(255) NOT NULL,

@@ -49,7 +49,7 @@ func (m *mockRepository) CreateUser(_ context.Context, login, password string) (
 	maxID := -1
 	for _, item := range m.items {
 		if item.Login == login {
-			return -1, errs.ErrConflict
+			return -1, errs.ErrDataConflict
 		}
 		maxID = max(maxID, item.ID)
 	}

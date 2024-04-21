@@ -1,7 +1,7 @@
 dsn: "postgres://127.0.0.1/postgres?sslmode=disable&user=postgres&password=postgres"
 password_hash_cost: 14
 http_server:
-  run_address: "127.0.0.1:8080"
+  run_address: "127.0.0.1:8081"
   timeout: "5s"
   idle_timeout: "60s"
 logger:

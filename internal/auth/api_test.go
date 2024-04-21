@@ -54,7 +54,7 @@ func TestRegisterOperationMiddleware(t *testing.T) {
 			repo:        &mockRepository{},
 			want: want{
 				statusCode: http.StatusBadRequest,
-				response:   fmt.Sprintf("%s: text/plain; charset=utf-8", errs.ErrContentType),
+				response:   fmt.Sprintf("%s: text/plain; charset=utf-8", errs.ErrInvalidContentType),
 			},
 			wantErr: true,
 		},
@@ -65,7 +65,7 @@ func TestRegisterOperationMiddleware(t *testing.T) {
 			repo:        &mockRepository{},
 			want: want{
 				statusCode: http.StatusBadRequest,
-				response:   "EOF",
+				response:   fmt.Sprintf("%v: empty body", errs.ErrInvalidPayload),
 			},
 			wantErr: true,
 		},
@@ -76,7 +76,7 @@ func TestRegisterOperationMiddleware(t *testing.T) {
 			repo:        &mockRepository{},
 			want: want{
 				statusCode: http.StatusBadRequest,
-				response:   fmt.Sprintf("%s: login", errs.ErrRequiredJSONBodyParam),
+				response:   fmt.Sprintf("%s: login", errs.ErrRequiredBodyParam),
 			},
 			wantErr: true,
 		},
@@ -87,7 +87,7 @@ func TestRegisterOperationMiddleware(t *testing.T) {
 			repo:        &mockRepository{},
 			want: want{
 				statusCode: http.StatusBadRequest,
-				response:   fmt.Sprintf("%s: password", errs.ErrRequiredJSONBodyParam),
+				response:   fmt.Sprintf("%s: password", errs.ErrRequiredBodyParam),
 			},
 			wantErr: true,
 		},
@@ -272,7 +272,7 @@ func TestLoginOperationMiddleware(t *testing.T) {
 			repo:        &mockRepository{},
 			want: want{
 				statusCode: http.StatusBadRequest,
-				response:   fmt.Sprintf("%s: text/plain; charset=utf-8", errs.ErrContentType),
+				response:   fmt.Sprintf("%s: text/plain; charset=utf-8", errs.ErrInvalidContentType),
 			},
 			wantErr: true,
 		},
@@ -283,7 +283,7 @@ func TestLoginOperationMiddleware(t *testing.T) {
 			repo:        &mockRepository{},
 			want: want{
 				statusCode: http.StatusBadRequest,
-				response:   "EOF",
+				response:   fmt.Sprintf("%v: empty body", errs.ErrInvalidPayload),
 			},
 			wantErr: true,
 		},
@@ -294,7 +294,7 @@ func TestLoginOperationMiddleware(t *testing.T) {
 			repo:        &mockRepository{},
 			want: want{
 				statusCode: http.StatusBadRequest,
-				response:   fmt.Sprintf("%s: login", errs.ErrRequiredJSONBodyParam),
+				response:   fmt.Sprintf("%s: login", errs.ErrRequiredBodyParam),
 			},
 			wantErr: true,
 		},
@@ -305,7 +305,7 @@ func TestLoginOperationMiddleware(t *testing.T) {
 			repo:        &mockRepository{},
 			want: want{
 				statusCode: http.StatusBadRequest,
-				response:   fmt.Sprintf("%s: password", errs.ErrRequiredJSONBodyParam),
+				response:   fmt.Sprintf("%s: password", errs.ErrRequiredBodyParam),
 			},
 			wantErr: true,
 		},
@@ -496,7 +496,7 @@ func TestRegisterHandler(t *testing.T) {
 			},
 			want: want{
 				statusCode: http.StatusConflict,
-				response:   fmt.Sprintf(`%v: login "gopher" already exists`, errs.ErrConflict),
+				response:   fmt.Sprintf(`%v: login "gopher" already exists`, errs.ErrDataConflict),
 			},
 			wantErr: true,
 		},

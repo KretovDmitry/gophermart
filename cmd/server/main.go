@@ -77,22 +77,25 @@ func run() error {
 	// }
 	// // Do not loose banners being asynchronously deleted
 	// defer bannerService.Stop()
-	//
-	// Init repository for auth service
+
+	// Init repository for auth service.
 	authRepo, err := auth.NewRepository(db, logger)
 	if err != nil {
 		return fmt.Errorf("failed to create auth repository: %w", err)
 	}
 
+	// Init auth service.
 	authService, err := auth.NewService(authRepo, logger, cfg)
 	if err != nil {
 		return fmt.Errorf("failed to init auth service: %w", err)
 	}
 
+	// Create root router.
 	router := chi.NewRouter()
 	router.Use(middleware.Logger)
 	router.Use(middleware.Recoverer)
 
+	// Init and group handlers for auth routes.
 	handler := auth.HandlerWithOptions(authService, auth.ChiServerOptions{
 		BaseURL:          "/api/user",
 		BaseRouter:       router,
@@ -113,10 +116,11 @@ func run() error {
 		signal.Notify(sig, syscall.SIGHUP, syscall.SIGINT,
 			syscall.SIGTERM, syscall.SIGQUIT, os.Interrupt)
 
-		<-sig
+		signal := <-sig
 
-		logger.Infof("Shutting down server with %s timeout",
-			cfg.HTTPServer.ShutdownTimeout)
+		logger.With(serverCtx, "signal", signal.String()).
+			Infof("Shutting down server with %s timeout",
+				cfg.HTTPServer.ShutdownTimeout)
 
 		if err = hs.Shutdown(serverCtx); err != nil {
 			logger.Errorf("graceful shutdown failed: %w", err)
@@ -125,12 +129,12 @@ func run() error {
 	}()
 
 	// Start the HTTP server with graceful shutdown.
-	logger.Infof("server %v is running at %v", Version, cfg.HTTPServer.Address)
+	logger.Infof("Server %v is running at %v", Version, cfg.HTTPServer.Address)
 	if err = hs.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return fmt.Errorf("run server failed: %w", err)
 	}
 
-	// Wait for server context to be stopped.
+	// Wait for server context to be stopped or force exit if timeout exceeded.
 	select {
 	case <-serverCtx.Done():
 	case <-time.After(cfg.HTTPServer.ShutdownTimeout):

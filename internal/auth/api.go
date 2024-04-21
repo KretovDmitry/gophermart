@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -48,7 +49,7 @@ func (siw *ServerInterfaceWrapper) Register(w http.ResponseWriter, r *http.Reque
 
 	contentType := r.Header.Get("Content-Type")
 	if strings.ToLower(strings.TrimSpace(contentType)) != "application/json" {
-		siw.ErrorHandlerFunc(w, r, fmt.Errorf("%w: %s", errs.ErrContentType, contentType))
+		siw.ErrorHandlerFunc(w, r, fmt.Errorf("%w: %s", errs.ErrInvalidContentType, contentType))
 		return
 	}
 
@@ -66,6 +67,10 @@ func (siw *ServerInterfaceWrapper) Register(w http.ResponseWriter, r *http.Reque
 			)
 			return
 		}
+		if errors.Is(err, io.EOF) {
+			siw.ErrorHandlerFunc(w, r, fmt.Errorf("%w: empty body", errs.ErrInvalidPayload))
+			return
+		}
 		siw.ErrorHandlerFunc(w, r, err)
 		return
 	}
@@ -73,14 +78,14 @@ func (siw *ServerInterfaceWrapper) Register(w http.ResponseWriter, r *http.Reque
 	// ------------- Required JSON body parameter "login" -------------
 
 	if params.Login == "" {
-		siw.ErrorHandlerFunc(w, r, fmt.Errorf("%w: login", errs.ErrRequiredJSONBodyParam))
+		siw.ErrorHandlerFunc(w, r, fmt.Errorf("%w: login", errs.ErrRequiredBodyParam))
 		return
 	}
 
 	// ------------- Required JSON body parameter "password" ----------
 
 	if params.Password == "" {
-		siw.ErrorHandlerFunc(w, r, fmt.Errorf("%w: password", errs.ErrRequiredJSONBodyParam))
+		siw.ErrorHandlerFunc(w, r, fmt.Errorf("%w: password", errs.ErrRequiredBodyParam))
 		return
 	}
 
@@ -109,7 +114,7 @@ func (siw *ServerInterfaceWrapper) Login(w http.ResponseWriter, r *http.Request)
 
 	contentType := r.Header.Get("Content-Type")
 	if strings.ToLower(strings.TrimSpace(contentType)) != "application/json" {
-		siw.ErrorHandlerFunc(w, r, fmt.Errorf("%w: %s", errs.ErrContentType, contentType))
+		siw.ErrorHandlerFunc(w, r, fmt.Errorf("%w: %s", errs.ErrInvalidContentType, contentType))
 		return
 	}
 
@@ -127,6 +132,10 @@ func (siw *ServerInterfaceWrapper) Login(w http.ResponseWriter, r *http.Request)
 			)
 			return
 		}
+		if errors.Is(err, io.EOF) {
+			siw.ErrorHandlerFunc(w, r, fmt.Errorf("%w: empty body", errs.ErrInvalidPayload))
+			return
+		}
 		siw.ErrorHandlerFunc(w, r, err)
 		return
 	}
@@ -134,14 +143,14 @@ func (siw *ServerInterfaceWrapper) Login(w http.ResponseWriter, r *http.Request)
 	// ------------- Required JSON body parameter "login" -------------
 
 	if params.Login == "" {
-		siw.ErrorHandlerFunc(w, r, fmt.Errorf("%w: login", errs.ErrRequiredJSONBodyParam))
+		siw.ErrorHandlerFunc(w, r, fmt.Errorf("%w: login", errs.ErrRequiredBodyParam))
 		return
 	}
 
 	// ------------- Required JSON body parameter "password" ----------
 
 	if params.Password == "" {
-		siw.ErrorHandlerFunc(w, r, fmt.Errorf("%w: password", errs.ErrRequiredJSONBodyParam))
+		siw.ErrorHandlerFunc(w, r, fmt.Errorf("%w: password", errs.ErrRequiredBodyParam))
 		return
 	}
 
