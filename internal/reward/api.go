@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/KretovDmitry/gophermart-loyalty-service/internal/luhn"
 	"github.com/KretovDmitry/gophermart-loyalty-service/internal/models/errs"
+	"github.com/KretovDmitry/gophermart-loyalty-service/pkg/luhn"
 	"github.com/go-chi/chi/v5"
 )
 

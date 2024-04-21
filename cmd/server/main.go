@@ -14,10 +14,13 @@ import (
 
 	"github.com/KretovDmitry/gophermart-loyalty-service/internal/auth"
 	"github.com/KretovDmitry/gophermart-loyalty-service/internal/config"
+	"github.com/KretovDmitry/gophermart-loyalty-service/internal/reward"
 	"github.com/KretovDmitry/gophermart-loyalty-service/pkg/logger"
+	"github.com/KretovDmitry/gophermart-loyalty-service/pkg/unzip"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/nanmu42/gzip"
 	sqldblogger "github.com/simukti/sqldb-logger"
 )
 
@@ -62,26 +65,10 @@ func run() error {
 		_ = logger.Sync()
 	}()
 
-	// // Init repository for banner service
-	// repo, err := banner.NewRepository(db, rdb, logger, cfg)
-	// if err != nil {
-	// 	logger.Errorf("failed to create banner repository: %s", err)
-	// 	os.Exit(1)
-	// }
-	//
-	// // Init service
-	// bannerService, err := banner.NewService(repo, logger, cfg)
-	// if err != nil {
-	// 	logger.Error("failed to init banner service")
-	// 	os.Exit(1)
-	// }
-	// // Do not loose banners being asynchronously deleted
-	// defer bannerService.Stop()
-
 	// Init repository for auth service.
 	authRepo, err := auth.NewRepository(db, logger)
 	if err != nil {
-		return fmt.Errorf("failed to create auth repository: %w", err)
+		return fmt.Errorf("failed to init auth repository: %w", err)
 	}
 
 	// Init auth service.
@@ -90,16 +77,39 @@ func run() error {
 		return fmt.Errorf("failed to init auth service: %w", err)
 	}
 
+	// Init repository for reward service.
+	repo, err := reward.NewRepository(db, logger)
+	if err != nil {
+		return fmt.Errorf("failed to init reward repository: %w", err)
+	}
+
+	// Init reward service.
+	rewardService, err := reward.NewService(repo, logger, cfg)
+	if err != nil {
+		return fmt.Errorf("failed to init banner service: %w", err)
+	}
+
 	// Create root router.
-	router := chi.NewRouter()
-	router.Use(middleware.Logger)
-	router.Use(middleware.Recoverer)
+	router := initRootRouter(logger)
 
 	// Init and group handlers for auth routes.
-	handler := auth.HandlerWithOptions(authService, auth.ChiServerOptions{
+	authHandlers := auth.HandlerWithOptions(authService, auth.ChiServerOptions{
 		BaseURL:          "/api/user",
 		BaseRouter:       router,
 		ErrorHandlerFunc: auth.ErrorHandlerFunc,
+	})
+
+	// Init and group handlers for reward routes.
+	rewHandlers := reward.HandlerWithOptions(rewardService, reward.ChiServerOptions{
+		BaseURL:          "/api/user",
+		BaseRouter:       router,
+		ErrorHandlerFunc: reward.ErrorHandlerFunc,
+	})
+
+	router.Handle("/", authHandlers)
+	router.Group(func(r chi.Router) {
+		r.Use(authService.Middleware)
+		r.Handle("/", rewHandlers)
 	})
 
 	// Build HTTP server.
@@ -107,7 +117,7 @@ func run() error {
 		Addr:              cfg.HTTPServer.Address,
 		ReadHeaderTimeout: cfg.HTTPServer.Timeout,
 		IdleTimeout:       cfg.HTTPServer.IdleTimeout,
-		Handler:           handler,
+		Handler:           router,
 	}
 
 	// Graceful shutdown.
@@ -123,7 +133,7 @@ func run() error {
 				cfg.HTTPServer.ShutdownTimeout)
 
 		if err = hs.Shutdown(serverCtx); err != nil {
-			logger.Errorf("graceful shutdown failed: %w", err)
+			logger.Errorf("graceful shutdown failed: %s", err)
 		}
 		serverStopCtx()
 	}()
@@ -142,4 +152,16 @@ func run() error {
 	}
 
 	return nil
+}
+
+func initRootRouter(logger logger.Logger) *chi.Mux {
+	router := chi.NewRouter()
+	router.Use(middleware.RequestID)
+	router.Use(middleware.RealIP)
+	router.Use(middleware.Logger)
+	router.Use(middleware.Recoverer)
+	router.Use(gzip.DefaultHandler().WrapHandler)
+	router.Use(unzip.Middleware(logger))
+
+	return router
 }
