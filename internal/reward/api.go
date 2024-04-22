@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/KretovDmitry/gophermart-loyalty-service/internal/models/errs"
@@ -13,7 +12,7 @@ import (
 )
 
 type PostOrderParams struct {
-	Number int
+	Number string
 }
 
 // ServerInterface represents all server handlers.
@@ -46,24 +45,18 @@ func (siw *ServerInterfaceWrapper) UploadOrder(w http.ResponseWriter, r *http.Re
 	var params PostOrderParams
 
 	defer r.Body.Close()
-	data, err := io.ReadAll(r.Body)
+	number, err := io.ReadAll(r.Body)
 	if err != nil {
 		siw.ErrorHandlerFunc(w, r, err)
 		return
 	}
 
-	if err = luhn.Validate(string(data)); err != nil {
-		siw.ErrorHandlerFunc(w, r, fmt.Errorf("%w: %w", errs.ErrInvalidPayload, err))
+	if err = luhn.Validate(string(number)); err != nil {
+		siw.ErrorHandlerFunc(w, r, errs.ErrInvalidOrderNumber)
 		return
 	}
 
-	number, err := strconv.Atoi(string(data))
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, err)
-		return
-	}
-
-	params.Number = number
+	params.Number = string(number)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateOrder(w, r, params)
@@ -120,9 +113,7 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
-	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/orders", wrapper.UploadOrder)
-	})
+	r.Post(options.BaseURL+"/orders", wrapper.UploadOrder)
 
 	return r
 }

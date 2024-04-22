@@ -15,6 +15,7 @@ import (
 	"github.com/KretovDmitry/gophermart-loyalty-service/internal/auth"
 	"github.com/KretovDmitry/gophermart-loyalty-service/internal/config"
 	"github.com/KretovDmitry/gophermart-loyalty-service/internal/reward"
+	"github.com/KretovDmitry/gophermart-loyalty-service/pkg/accesslog"
 	"github.com/KretovDmitry/gophermart-loyalty-service/pkg/logger"
 	"github.com/KretovDmitry/gophermart-loyalty-service/pkg/unzip"
 	"github.com/go-chi/chi/v5"
@@ -91,6 +92,7 @@ func run() error {
 
 	// Create root router.
 	router := initRootRouter(logger)
+	router.Use(authService.Middleware)
 
 	// Init and group handlers for auth routes.
 	authHandlers := auth.HandlerWithOptions(authService, auth.ChiServerOptions{
@@ -99,18 +101,17 @@ func run() error {
 		ErrorHandlerFunc: auth.ErrorHandlerFunc,
 	})
 
-	// Init and group handlers for reward routes.
+	// Init handlers for reward routes.
 	rewHandlers := reward.HandlerWithOptions(rewardService, reward.ChiServerOptions{
 		BaseURL:          "/api/user",
 		BaseRouter:       router,
 		ErrorHandlerFunc: reward.ErrorHandlerFunc,
 	})
 
-	router.Handle("/", authHandlers)
-	router.Group(func(r chi.Router) {
-		r.Use(authService.Middleware)
-		r.Handle("/", rewHandlers)
-	})
+	router.Handle("/api/user", authHandlers)
+	router.Handle("/api/user", rewHandlers)
+
+	logger.Info(router.Routes())
 
 	// Build HTTP server.
 	hs := &http.Server{
@@ -156,9 +157,7 @@ func run() error {
 
 func initRootRouter(logger logger.Logger) *chi.Mux {
 	router := chi.NewRouter()
-	router.Use(middleware.RequestID)
-	router.Use(middleware.RealIP)
-	router.Use(middleware.Logger)
+	router.Use(accesslog.Handler(logger))
 	router.Use(middleware.Recoverer)
 	router.Use(gzip.DefaultHandler().WrapHandler)
 	router.Use(unzip.Middleware(logger))

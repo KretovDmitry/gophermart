@@ -3,6 +3,7 @@ package reward
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/KretovDmitry/gophermart-loyalty-service/internal/config"
@@ -41,19 +42,12 @@ func (s *Service) CreateOrder(w http.ResponseWriter, r *http.Request, params Pos
 	}
 
 	if err := s.repo.CreateOrder(r.Context(), order); err != nil {
-		if !errors.Is(err, errs.ErrDataConflict) {
-			ErrorHandlerFunc(w, r, err)
-			return
-		}
-	}
-
-	order, err := s.repo.GetOrderByNumber(r.Context(), params.Number)
-	if err != nil {
+		ErrorHandlerFunc(w, r, err)
 		return
 	}
 
 	if order.UserID != u.ID {
-		w.WriteHeader(http.StatusConflict)
+		ErrorHandlerFunc(w, r, fmt.Errorf("%w: uploaded by another user", errs.ErrDataConflict))
 		return
 	}
 
@@ -81,6 +75,10 @@ func ErrorHandlerFunc(w http.ResponseWriter, _ *http.Request, err error) {
 	// Status Conflict.
 	case errors.Is(err, errs.ErrDataConflict):
 		code = http.StatusConflict
+
+	// Status Unproccessable Entity
+	case errors.Is(err, errs.ErrInvalidOrderNumber):
+		code = http.StatusUnprocessableEntity
 	}
 
 	w.WriteHeader(code)

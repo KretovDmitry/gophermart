@@ -12,9 +12,9 @@ const (
 )
 
 type Order struct {
+	Number     string
 	UploadetAt time.Time
 	Status     Status
 	ID         int
 	UserID     int
-	Number     int
 }

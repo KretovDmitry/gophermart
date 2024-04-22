@@ -13,6 +13,7 @@ var (
 	ErrRequiredBodyParam  = errors.New("body argument is required, bot not found")
 	ErrInvalidContentType = errors.New("invalid content type")
 	ErrInvalidCredentials = errors.New("invalid credentials")
+	ErrInvalidOrderNumber = errors.New("invalid order number")
 )
 
 // Type just for murshallig purpose.

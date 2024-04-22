@@ -114,7 +114,9 @@ func (s *Service) Login(w http.ResponseWriter, r *http.Request, params LoginPara
 // Authorization middleware.
 func (s *Service) Middleware(next http.Handler) http.Handler {
 	f := func(w http.ResponseWriter, r *http.Request) {
+		s.logger.Info(r.URL.Path)
 		authCookie, err := r.Cookie("Authorization")
+		s.logger.Info(r.Cookies())
 		if err != nil {
 			if errors.Is(err, http.ErrNoCookie) {
 				ErrorHandlerFunc(w, r, fmt.Errorf("authorization token: %w", errs.ErrNotFound))
