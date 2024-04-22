@@ -33,27 +33,27 @@ test-cover: test ## run unit tests and show test coverage information
 
 .PHONY: run
 run: ## run the API server
-	go run ${LDFLAGS} cmd/server/main.go
+	go run ${LDFLAGS} cmd/gophermart/main.go
 
 .PHONY: run-restart
 run-restart: ## restart the API server
 	@pkill -P `cat $(PID_FILE)` || true
 	@printf '%*s\n' "80" '' | tr ' ' -
 	@echo "Source file changed. Restarting server..."
-	@go run ${LDFLAGS} cmd/server/main.go & echo $$! > $(PID_FILE)
+	@go run ${LDFLAGS} cmd/gophermart/main.go & echo $$! > $(PID_FILE)
 	@printf '%*s\n' "80" '' | tr ' ' -
 
 run-live: ## run the API server with live reload support (requires fswatch)
-	@go run ${LDFLAGS} cmd/server/main.go & echo $$! > $(PID_FILE)
+	@go run ${LDFLAGS} cmd/gophermart/main.go & echo $$! > $(PID_FILE)
 	@fswatch -x -o --event Created --event Updated --event Renamed -r internal pkg cmd config | xargs -I {} make run-restart
 
 .PHONY: build
 build:  ## build the API server binary
-	CGO_ENABLED=0 go build ${LDFLAGS} -a -o server $(MODULE)/cmd/server
+	CGO_ENABLED=0 go build ${LDFLAGS} -a -o server $(MODULE)/cmd/gophermart
 
 .PHONY: build-docker
 build-docker: ## build the API server as a docker image
-	docker build -f cmd/server/Dockerfile -t server .
+	docker build -f cmd/gophermart/Dockerfile -t server .
 
 .PHONY: clean
 clean: ## remove temporary files
@@ -110,6 +110,6 @@ migrate-new: ## create a new database migration
 .PHONY: migrate-reset
 migrate-reset: ## reset database and re-run all migrations
 	@echo "Resetting database..."
-	@$(MIGRATE) down 1
+	@$(MIGRATE) drop -f
 	@echo "Running all database migrations..."
 	@$(MIGRATE) up

@@ -1,6 +1,7 @@
 package reward
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -17,8 +18,10 @@ type PostOrderParams struct {
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
-	// Order upload (POST /api/user/orders)
+	// Order upload (POST /api/user/orders).
 	CreateOrder(w http.ResponseWriter, r *http.Request, params PostOrderParams)
+	// Get user orders (DET /api/user/orders).
+	GetOrders(w http.ResponseWriter, r *http.Request)
 }
 
 // ServerInterfaceWrapper converts payloads to parameters.
@@ -31,7 +34,7 @@ type ServerInterfaceWrapper struct {
 type MiddlewareFunc func(http.Handler) http.Handler
 
 // Login operation middleware.
-func (siw *ServerInterfaceWrapper) UploadOrder(w http.ResponseWriter, r *http.Request) {
+func (siw *ServerInterfaceWrapper) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	// ------------- Required text/plain content type -----------------
 
 	contentType := r.Header.Get("Content-Type")
@@ -45,18 +48,24 @@ func (siw *ServerInterfaceWrapper) UploadOrder(w http.ResponseWriter, r *http.Re
 	var params PostOrderParams
 
 	defer r.Body.Close()
-	number, err := io.ReadAll(r.Body)
+	bytes, err := io.ReadAll(r.Body)
 	if err != nil {
+		if errors.Is(err, io.EOF) {
+			siw.ErrorHandlerFunc(w, r, fmt.Errorf("%w: empty body", errs.ErrInvalidPayload))
+			return
+		}
 		siw.ErrorHandlerFunc(w, r, err)
 		return
 	}
 
-	if err = luhn.Validate(string(number)); err != nil {
+	number := string(bytes)
+
+	if err = luhn.Validate(number); err != nil {
 		siw.ErrorHandlerFunc(w, r, errs.ErrInvalidOrderNumber)
 		return
 	}
 
-	params.Number = string(number)
+	params.Number = number
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateOrder(w, r, params)
@@ -113,7 +122,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
-	r.Post(options.BaseURL+"/orders", wrapper.UploadOrder)
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/orders", wrapper.CreateOrder)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/orders", si.GetOrders)
+	})
 
 	return r
 }

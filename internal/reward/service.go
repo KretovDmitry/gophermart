@@ -3,7 +3,6 @@ package reward
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 
 	"github.com/KretovDmitry/gophermart-loyalty-service/internal/config"
@@ -46,12 +45,26 @@ func (s *Service) CreateOrder(w http.ResponseWriter, r *http.Request, params Pos
 		return
 	}
 
-	if order.UserID != u.ID {
-		ErrorHandlerFunc(w, r, fmt.Errorf("%w: uploaded by another user", errs.ErrDataConflict))
+	w.WriteHeader(http.StatusAccepted)
+}
+
+func (s *Service) GetOrders(w http.ResponseWriter, r *http.Request) {
+	u, found := user.FromContext(r.Context())
+	if !found {
+		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
+	orders, err := s.repo.GetOrdersByUserID(r.Context(), u.ID)
+	if err != nil {
+		ErrorHandlerFunc(w, r, err)
+		return
+	}
+
+	if err = json.NewEncoder(w).Encode(orders); err != nil {
+		ErrorHandlerFunc(w, r, err)
+		return
+	}
 }
 
 // ErrorHandlerFunc handles sending of an error in the JSON format,
@@ -61,16 +74,19 @@ func ErrorHandlerFunc(w http.ResponseWriter, _ *http.Request, err error) {
 	code := http.StatusInternalServerError
 
 	switch {
+	// Status OK
+	case errors.Is(err, errs.ErrAlreadyExists):
+		code = http.StatusOK
+
 	// Status Bad Request.
 	case errors.Is(err, errs.ErrRequiredBodyParam) ||
 		errors.Is(err, errs.ErrInvalidPayload) ||
 		errors.Is(err, errs.ErrInvalidContentType):
 		code = http.StatusBadRequest
 
-	// Status Unauthorized.
-	case errors.Is(err, errs.ErrNotFound) ||
-		errors.Is(err, errs.ErrInvalidCredentials):
-		code = http.StatusUnauthorized
+	// Status No Content.
+	case errors.Is(err, errs.ErrNotFound):
+		code = http.StatusNoContent
 
 	// Status Conflict.
 	case errors.Is(err, errs.ErrDataConflict):

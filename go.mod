@@ -10,6 +10,7 @@ require (
 	github.com/jackc/pgerrcode v0.0.0-20240316143900-6e2875d9b438
 	github.com/jackc/pgx/v5 v5.5.5
 	github.com/nanmu42/gzip v1.2.0
+	github.com/shopspring/decimal v1.4.0
 	github.com/simukti/sqldb-logger v0.0.0-20230108155151-646c1a075551
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/zap v1.27.0

@@ -105,6 +105,7 @@ func run() error {
 	rewHandlers := reward.HandlerWithOptions(rewardService, reward.ChiServerOptions{
 		BaseURL:          "/api/user",
 		BaseRouter:       router,
+		Middlewares:      []reward.MiddlewareFunc{authService.Middleware},
 		ErrorHandlerFunc: reward.ErrorHandlerFunc,
 	})
 

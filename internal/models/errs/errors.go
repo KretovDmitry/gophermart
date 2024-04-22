@@ -9,6 +9,7 @@ var (
 	ErrNotFound           = errors.New("not found")
 	ErrRateLimit          = errors.New("rate limit")
 	ErrDataConflict       = errors.New("data conflict")
+	ErrAlreadyExists      = errors.New("already exists")
 	ErrInvalidPayload     = errors.New("invalid payload")
 	ErrRequiredBodyParam  = errors.New("body argument is required, bot not found")
 	ErrInvalidContentType = errors.New("invalid content type")

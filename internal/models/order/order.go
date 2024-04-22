@@ -1,20 +1,25 @@
 package order
 
-import "time"
+import (
+	"time"
 
-type Status string
+	"github.com/shopspring/decimal"
+)
+
+type OrderStatus string
 
 const (
-	INVALID    Status = "INVALID"
-	PROCESSED  Status = "PROCESSED"
-	NEW        Status = "NEW"
-	PROCESSING Status = "PROCESSING"
+	INVALID    OrderStatus = "INVALID"
+	PROCESSED  OrderStatus = "PROCESSED"
+	NEW        OrderStatus = "NEW"
+	PROCESSING OrderStatus = "PROCESSING"
 )
 
 type Order struct {
-	Number     string
-	UploadetAt time.Time
-	Status     Status
-	ID         int
-	UserID     int
+	ID         int             `json:"id"`
+	UserID     int             `json:"user_id"`
+	Number     string          `json:"number"`
+	Status     OrderStatus     `json:"status"`
+	Accrual    decimal.Decimal `json:"accrual"`
+	UploadetAt time.Time       `json:"uploadet_at"`
 }

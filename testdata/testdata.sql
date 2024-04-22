@@ -6,10 +6,10 @@ INSERT INTO users (login, PASSWORD)
 ON CONFLICT
     DO NOTHING;
 
-INSERT INTO orders (user_id, number)
-    VALUES (1, '79927398713'),
-    (2, '49927398716'),
-    (2, '0')
+INSERT INTO orders (user_id, number, status, accrual)
+    VALUES (1, '79927398713', 'NEW', 0),
+    (2, '49927398716', 'PROCESSED', 417.863),
+    (2, '0', 'PROCESSING', 0)
 ON CONFLICT
     DO NOTHING;
 

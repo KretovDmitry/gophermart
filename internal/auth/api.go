@@ -26,9 +26,9 @@ type LoginParams struct {
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
-	// Registration (POST /api/user/register)
+	// Registration (POST /api/user/register).
 	Register(w http.ResponseWriter, r *http.Request, params RegisterParams)
-	// Authentication (POST /api/user/login)
+	// Authentication (POST /api/user/login).
 	Login(w http.ResponseWriter, r *http.Request, params LoginParams)
 }
 
