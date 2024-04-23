@@ -10,23 +10,29 @@ import (
 	"github.com/KretovDmitry/gophermart-loyalty-service/internal/models/order"
 	"github.com/KretovDmitry/gophermart-loyalty-service/internal/models/user"
 	"github.com/KretovDmitry/gophermart-loyalty-service/pkg/logger"
+	"github.com/avito-tech/go-transaction-manager/trm/v2/manager"
 )
 
 type Service struct {
 	repo   Repository
+	trm    *manager.Manager
 	logger logger.Logger
 	config *config.Config
 }
 
-func NewService(repo Repository, logger logger.Logger, config *config.Config) (*Service, error) {
+func NewService(repo Repository, trm *manager.Manager, logger logger.Logger, config *config.Config) (*Service, error) {
 	if config == nil {
 		return nil, errors.New("nil dependency: config")
 	}
-	return &Service{repo: repo, logger: logger, config: config}, nil
+	if trm == nil {
+		return nil, errors.New("nil dependency: transaction manager")
+	}
+	return &Service{repo: repo, trm: trm, logger: logger, config: config}, nil
 }
 
 var _ ServerInterface = (*Service)(nil)
 
+// Create new order (POST /api/user/orders).
 func (s *Service) CreateOrder(w http.ResponseWriter, r *http.Request, params PostOrderParams) {
 	u, found := user.FromContext(r.Context())
 	if !found {
@@ -48,6 +54,7 @@ func (s *Service) CreateOrder(w http.ResponseWriter, r *http.Request, params Pos
 	w.WriteHeader(http.StatusAccepted)
 }
 
+// Get user orders (GET /api/user/orders HTTP/1.1).
 func (s *Service) GetOrders(w http.ResponseWriter, r *http.Request) {
 	u, found := user.FromContext(r.Context())
 	if !found {
@@ -67,6 +74,26 @@ func (s *Service) GetOrders(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Get user account data (GET /api/user/balance HTTP/1.1).
+func (s *Service) GetAccount(w http.ResponseWriter, r *http.Request) {
+	u, found := user.FromContext(r.Context())
+	if !found {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	account, err := s.repo.GetAccountByUserID(r.Context(), u.ID)
+	if err != nil {
+		ErrorHandlerFunc(w, r, err)
+		return
+	}
+
+	if err = json.NewEncoder(w).Encode(account); err != nil {
+		ErrorHandlerFunc(w, r, err)
+		return
+	}
+}
+
 // ErrorHandlerFunc handles sending of an error in the JSON format,
 // writing appropriate status code and handling the failure to marshal that.
 func ErrorHandlerFunc(w http.ResponseWriter, _ *http.Request, err error) {
@@ -79,9 +106,7 @@ func ErrorHandlerFunc(w http.ResponseWriter, _ *http.Request, err error) {
 		code = http.StatusOK
 
 	// Status Bad Request.
-	case errors.Is(err, errs.ErrRequiredBodyParam) ||
-		errors.Is(err, errs.ErrInvalidPayload) ||
-		errors.Is(err, errs.ErrInvalidContentType):
+	case errors.Is(err, errs.ErrInvalidRequest):
 		code = http.StatusBadRequest
 
 	// Status No Content.

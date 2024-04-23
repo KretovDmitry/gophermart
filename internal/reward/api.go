@@ -22,24 +22,25 @@ type ServerInterface interface {
 	CreateOrder(w http.ResponseWriter, r *http.Request, params PostOrderParams)
 	// Get user orders (DET /api/user/orders).
 	GetOrders(w http.ResponseWriter, r *http.Request)
+	// Get user account data (GET /api/user/balance HTTP/1.1).
+	GetAccount(w http.ResponseWriter, r *http.Request)
 }
 
 // ServerInterfaceWrapper converts payloads to parameters.
 type ServerInterfaceWrapper struct {
-	Handler            ServerInterface
-	ErrorHandlerFunc   func(w http.ResponseWriter, r *http.Request, err error)
-	HandlerMiddlewares []MiddlewareFunc
+	Handler          ServerInterface
+	ErrorHandlerFunc func(w http.ResponseWriter, r *http.Request, err error)
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
 
-// Login operation middleware.
+// Create order operation middleware.
 func (siw *ServerInterfaceWrapper) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	// ------------- Required text/plain content type -----------------
 
 	contentType := r.Header.Get("Content-Type")
 	if !isTextPlainContentType(contentType) {
-		siw.ErrorHandlerFunc(w, r, fmt.Errorf("%w: %s", errs.ErrInvalidContentType, contentType))
+		siw.ErrorHandlerFunc(w, r, fmt.Errorf("%w: invalid content type", errs.ErrInvalidRequest))
 		return
 	}
 
@@ -51,7 +52,7 @@ func (siw *ServerInterfaceWrapper) CreateOrder(w http.ResponseWriter, r *http.Re
 	bytes, err := io.ReadAll(r.Body)
 	if err != nil {
 		if errors.Is(err, io.EOF) {
-			siw.ErrorHandlerFunc(w, r, fmt.Errorf("%w: empty body", errs.ErrInvalidPayload))
+			siw.ErrorHandlerFunc(w, r, fmt.Errorf("%w: empty body", errs.ErrInvalidRequest))
 			return
 		}
 		siw.ErrorHandlerFunc(w, r, err)
@@ -67,15 +68,7 @@ func (siw *ServerInterfaceWrapper) CreateOrder(w http.ResponseWriter, r *http.Re
 
 	params.Number = number
 
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateOrder(w, r, params)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
+	siw.Handler.CreateOrder(w, r, params)
 }
 
 // Handler creates http.Handler with routing matching spec.
@@ -117,16 +110,17 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		}
 	}
 	wrapper := ServerInterfaceWrapper{
-		Handler:            si,
-		HandlerMiddlewares: options.Middlewares,
-		ErrorHandlerFunc:   options.ErrorHandlerFunc,
+		Handler:          si,
+		ErrorHandlerFunc: options.ErrorHandlerFunc,
 	}
 
 	r.Group(func(r chi.Router) {
+		for _, middleware := range options.Middlewares {
+			r.Use(middleware)
+		}
 		r.Post(options.BaseURL+"/orders", wrapper.CreateOrder)
-	})
-	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/orders", si.GetOrders)
+		r.Get(options.BaseURL+"/balance", si.GetAccount)
 	})
 
 	return r

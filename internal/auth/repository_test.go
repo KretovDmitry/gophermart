@@ -63,3 +63,7 @@ func (m *mockRepository) CreateUser(_ context.Context, login, password string) (
 	m.mu.Unlock()
 	return maxID + 1, nil
 }
+
+func (m *mockRepository) CreateAccount(_ context.Context, userID int) error {
+	return nil
+}

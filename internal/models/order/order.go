@@ -6,20 +6,20 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-type OrderStatus string
+type Status string
 
 const (
-	INVALID    OrderStatus = "INVALID"
-	PROCESSED  OrderStatus = "PROCESSED"
-	NEW        OrderStatus = "NEW"
-	PROCESSING OrderStatus = "PROCESSING"
+	INVALID    Status = "INVALID"
+	PROCESSED  Status = "PROCESSED"
+	NEW        Status = "NEW"
+	PROCESSING Status = "PROCESSING"
 )
 
 type Order struct {
 	ID         int             `json:"id"`
 	UserID     int             `json:"user_id"`
 	Number     string          `json:"number"`
-	Status     OrderStatus     `json:"status"`
+	Status     Status          `json:"status"`
 	Accrual    decimal.Decimal `json:"accrual"`
 	UploadetAt time.Time       `json:"uploadet_at"`
 }

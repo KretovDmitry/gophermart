@@ -34,9 +34,8 @@ type ServerInterface interface {
 
 // ServerInterfaceWrapper converts payloads to parameters.
 type ServerInterfaceWrapper struct {
-	Handler            ServerInterface
-	ErrorHandlerFunc   func(w http.ResponseWriter, r *http.Request, err error)
-	HandlerMiddlewares []MiddlewareFunc
+	Handler          ServerInterface
+	ErrorHandlerFunc func(w http.ResponseWriter, r *http.Request, err error)
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
@@ -49,7 +48,7 @@ func (siw *ServerInterfaceWrapper) Register(w http.ResponseWriter, r *http.Reque
 
 	contentType := r.Header.Get("Content-Type")
 	if strings.ToLower(strings.TrimSpace(contentType)) != "application/json" {
-		siw.ErrorHandlerFunc(w, r, fmt.Errorf("%w: %s", errs.ErrInvalidContentType, contentType))
+		siw.ErrorHandlerFunc(w, r, fmt.Errorf("%w: invalid content type", errs.ErrInvalidRequest))
 		return
 	}
 
@@ -63,12 +62,12 @@ func (siw *ServerInterfaceWrapper) Register(w http.ResponseWriter, r *http.Reque
 		if errors.As(err, &e) {
 			siw.ErrorHandlerFunc(w, r, fmt.Errorf(
 				"%w: %s must be of type %s, got %s",
-				errs.ErrInvalidPayload, e.Field, e.Type, e.Value),
+				errs.ErrInvalidRequest, e.Field, e.Type, e.Value),
 			)
 			return
 		}
 		if errors.Is(err, io.EOF) {
-			siw.ErrorHandlerFunc(w, r, fmt.Errorf("%w: empty body", errs.ErrInvalidPayload))
+			siw.ErrorHandlerFunc(w, r, fmt.Errorf("%w: empty body", errs.ErrInvalidRequest))
 			return
 		}
 		siw.ErrorHandlerFunc(w, r, err)
@@ -78,14 +77,14 @@ func (siw *ServerInterfaceWrapper) Register(w http.ResponseWriter, r *http.Reque
 	// ------------- Required JSON body parameter "login" -------------
 
 	if params.Login == "" {
-		siw.ErrorHandlerFunc(w, r, fmt.Errorf("%w: login", errs.ErrRequiredBodyParam))
+		siw.ErrorHandlerFunc(w, r, fmt.Errorf("%w: login required", errs.ErrInvalidRequest))
 		return
 	}
 
 	// ------------- Required JSON body parameter "password" ----------
 
 	if params.Password == "" {
-		siw.ErrorHandlerFunc(w, r, fmt.Errorf("%w: password", errs.ErrRequiredBodyParam))
+		siw.ErrorHandlerFunc(w, r, fmt.Errorf("%w: password required", errs.ErrInvalidRequest))
 		return
 	}
 
@@ -93,19 +92,11 @@ func (siw *ServerInterfaceWrapper) Register(w http.ResponseWriter, r *http.Reque
 	if len(params.Password) > MaxPasswordLength {
 		ErrorHandlerFunc(w, r, fmt.Errorf(
 			"%w: password must not exceed 72 characters in length",
-			errs.ErrInvalidPayload))
+			errs.ErrInvalidRequest))
 		return
 	}
 
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.Register(w, r, params)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
+	siw.Handler.Register(w, r, params)
 }
 
 // Login operation middleware.
@@ -114,7 +105,7 @@ func (siw *ServerInterfaceWrapper) Login(w http.ResponseWriter, r *http.Request)
 
 	contentType := r.Header.Get("Content-Type")
 	if strings.ToLower(strings.TrimSpace(contentType)) != "application/json" {
-		siw.ErrorHandlerFunc(w, r, fmt.Errorf("%w: %s", errs.ErrInvalidContentType, contentType))
+		siw.ErrorHandlerFunc(w, r, fmt.Errorf("%w: invalid content type", errs.ErrInvalidRequest))
 		return
 	}
 
@@ -128,12 +119,12 @@ func (siw *ServerInterfaceWrapper) Login(w http.ResponseWriter, r *http.Request)
 		if errors.As(err, &e) {
 			siw.ErrorHandlerFunc(w, r, fmt.Errorf(
 				"%w: %s must be of type %s, got %s",
-				errs.ErrInvalidPayload, e.Field, e.Type, e.Value),
+				errs.ErrInvalidRequest, e.Field, e.Type, e.Value),
 			)
 			return
 		}
 		if errors.Is(err, io.EOF) {
-			siw.ErrorHandlerFunc(w, r, fmt.Errorf("%w: empty body", errs.ErrInvalidPayload))
+			siw.ErrorHandlerFunc(w, r, fmt.Errorf("%w: empty body", errs.ErrInvalidRequest))
 			return
 		}
 		siw.ErrorHandlerFunc(w, r, err)
@@ -143,26 +134,18 @@ func (siw *ServerInterfaceWrapper) Login(w http.ResponseWriter, r *http.Request)
 	// ------------- Required JSON body parameter "login" -------------
 
 	if params.Login == "" {
-		siw.ErrorHandlerFunc(w, r, fmt.Errorf("%w: login", errs.ErrRequiredBodyParam))
+		siw.ErrorHandlerFunc(w, r, fmt.Errorf("%w: login required", errs.ErrInvalidRequest))
 		return
 	}
 
 	// ------------- Required JSON body parameter "password" ----------
 
 	if params.Password == "" {
-		siw.ErrorHandlerFunc(w, r, fmt.Errorf("%w: password", errs.ErrRequiredBodyParam))
+		siw.ErrorHandlerFunc(w, r, fmt.Errorf("%w: password required", errs.ErrInvalidRequest))
 		return
 	}
 
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.Login(w, r, params)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
+	siw.Handler.Login(w, r, params)
 }
 
 // Handler creates http.Handler with routing matching spec.
@@ -204,15 +187,15 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		}
 	}
 	wrapper := ServerInterfaceWrapper{
-		Handler:            si,
-		HandlerMiddlewares: options.Middlewares,
-		ErrorHandlerFunc:   options.ErrorHandlerFunc,
+		Handler:          si,
+		ErrorHandlerFunc: options.ErrorHandlerFunc,
 	}
 
 	r.Group(func(r chi.Router) {
+		for _, middleware := range options.Middlewares {
+			r.Use(middleware)
+		}
 		r.Post(options.BaseURL+"/register", wrapper.Register)
-	})
-	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/login", wrapper.Login)
 	})
 

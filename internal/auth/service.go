@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,20 +13,25 @@ import (
 	"github.com/KretovDmitry/gophermart-loyalty-service/internal/models/errs"
 	"github.com/KretovDmitry/gophermart-loyalty-service/internal/models/user"
 	"github.com/KretovDmitry/gophermart-loyalty-service/pkg/logger"
+	"github.com/avito-tech/go-transaction-manager/trm/v2/manager"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type Service struct {
 	repo   Repository
+	trm    *manager.Manager
 	logger logger.Logger
 	config *config.Config
 }
 
-func NewService(repo Repository, logger logger.Logger, config *config.Config) (*Service, error) {
+func NewService(repo Repository, trm *manager.Manager, logger logger.Logger, config *config.Config) (*Service, error) {
 	if config == nil {
 		return nil, errors.New("nil dependency: config")
 	}
-	return &Service{repo: repo, logger: logger, config: config}, nil
+	if trm == nil {
+		return nil, errors.New("nil dependency: transaction manager")
+	}
+	return &Service{repo: repo, trm: trm, logger: logger, config: config}, nil
 }
 
 var _ ServerInterface = (*Service)(nil)
@@ -39,8 +45,21 @@ func (s *Service) Register(w http.ResponseWriter, r *http.Request, params Regist
 		return
 	}
 
-	// Create user.
-	id, err := s.repo.CreateUser(r.Context(), params.Login, string(hashPassword))
+	var userID int
+
+	// Create user and his account.
+	err = s.trm.Do(r.Context(), func(ctx context.Context) error {
+		userID, err = s.repo.CreateUser(ctx, params.Login, string(hashPassword))
+		if err != nil {
+			return err
+		}
+
+		if err = s.repo.CreateAccount(ctx, userID); err != nil {
+			return err
+		}
+
+		return nil
+	})
 	if err != nil {
 		if errors.Is(err, errs.ErrDataConflict) {
 			ErrorHandlerFunc(w, r, fmt.Errorf("%w: login %q already exists", err, params.Login))
@@ -51,7 +70,7 @@ func (s *Service) Register(w http.ResponseWriter, r *http.Request, params Regist
 	}
 
 	// Build authentication token.
-	authToken, err := jwt.BuildString(id, s.config.JWT.SigningKey, s.config.JWT.Expiration)
+	authToken, err := jwt.BuildString(userID, s.config.JWT.SigningKey, s.config.JWT.Expiration)
 	if err != nil {
 		ErrorHandlerFunc(w, r, fmt.Errorf("build token: %w", err))
 		return
@@ -73,11 +92,6 @@ func (s *Service) Login(w http.ResponseWriter, r *http.Request, params LoginPara
 	// Retrieve user from the database with provided login.
 	u, err := s.repo.GetUserByLogin(r.Context(), params.Login)
 	if err != nil {
-		if errors.Is(err, errs.ErrNotFound) {
-			ErrorHandlerFunc(w, r, fmt.Errorf("%w: user with login %q not found",
-				errs.ErrInvalidCredentials, params.Login))
-			return
-		}
 		ErrorHandlerFunc(w, r, fmt.Errorf("get user %q: %w", params.Login, err))
 		return
 	}
@@ -114,9 +128,7 @@ func (s *Service) Login(w http.ResponseWriter, r *http.Request, params LoginPara
 // Authorization middleware.
 func (s *Service) Middleware(next http.Handler) http.Handler {
 	f := func(w http.ResponseWriter, r *http.Request) {
-		s.logger.Info(r.URL.Path)
 		authCookie, err := r.Cookie("Authorization")
-		s.logger.Info(r.Cookies())
 		if err != nil {
 			if errors.Is(err, http.ErrNoCookie) {
 				ErrorHandlerFunc(w, r, fmt.Errorf("authorization token: %w", errs.ErrNotFound))
@@ -154,9 +166,7 @@ func ErrorHandlerFunc(w http.ResponseWriter, _ *http.Request, err error) {
 
 	switch {
 	// Status Bad Request.
-	case errors.Is(err, errs.ErrRequiredBodyParam) ||
-		errors.Is(err, errs.ErrInvalidPayload) ||
-		errors.Is(err, errs.ErrInvalidContentType):
+	case errors.Is(err, errs.ErrInvalidRequest):
 		code = http.StatusBadRequest
 
 	// Status Unauthorized.

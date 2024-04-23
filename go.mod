@@ -1,8 +1,10 @@
 module github.com/KretovDmitry/gophermart-loyalty-service
 
-go 1.22.2
+go 1.21.9
 
 require (
+	github.com/avito-tech/go-transaction-manager/drivers/sql/v2 v2.0.0-rc8
+	github.com/avito-tech/go-transaction-manager/trm/v2 v2.0.0-rc8
 	github.com/go-chi/chi/v5 v5.0.12
 	github.com/golang-jwt/jwt/v4 v4.5.0
 	github.com/google/uuid v1.6.0
@@ -38,7 +40,6 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/rogpeppe/go-internal v1.12.0 // indirect
 	github.com/signalsciences/ac v1.2.0 // indirect
 	github.com/ugorji/go/codec v1.2.6 // indirect
 	go.uber.org/multierr v1.10.0 // indirect

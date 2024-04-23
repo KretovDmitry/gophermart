@@ -18,6 +18,9 @@ import (
 	"github.com/KretovDmitry/gophermart-loyalty-service/pkg/accesslog"
 	"github.com/KretovDmitry/gophermart-loyalty-service/pkg/logger"
 	"github.com/KretovDmitry/gophermart-loyalty-service/pkg/unzip"
+	trmsql "github.com/avito-tech/go-transaction-manager/drivers/sql/v2"
+	trmcontext "github.com/avito-tech/go-transaction-manager/trm/v2/context"
+	"github.com/avito-tech/go-transaction-manager/trm/v2/manager"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -66,33 +69,38 @@ func run() error {
 		_ = logger.Sync()
 	}()
 
+	// Create default transaction manager for database/sql package.
+	trManager := manager.Must(
+		trmsql.NewDefaultFactory(db),
+		manager.WithCtxManager(trmcontext.DefaultManager),
+	)
+
 	// Init repository for auth service.
-	authRepo, err := auth.NewRepository(db, logger)
+	authRepo, err := auth.NewRepository(db, trmsql.DefaultCtxGetter, logger)
 	if err != nil {
 		return fmt.Errorf("failed to init auth repository: %w", err)
 	}
 
 	// Init auth service.
-	authService, err := auth.NewService(authRepo, logger, cfg)
+	authService, err := auth.NewService(authRepo, trManager, logger, cfg)
 	if err != nil {
 		return fmt.Errorf("failed to init auth service: %w", err)
 	}
 
 	// Init repository for reward service.
-	repo, err := reward.NewRepository(db, logger)
+	rewardRepo, err := reward.NewRepository(db, trmsql.DefaultCtxGetter, logger)
 	if err != nil {
 		return fmt.Errorf("failed to init reward repository: %w", err)
 	}
 
 	// Init reward service.
-	rewardService, err := reward.NewService(repo, logger, cfg)
+	rewardService, err := reward.NewService(rewardRepo, trManager, logger, cfg)
 	if err != nil {
 		return fmt.Errorf("failed to init banner service: %w", err)
 	}
 
 	// Create root router.
 	router := initRootRouter(logger)
-	router.Use(authService.Middleware)
 
 	// Init and group handlers for auth routes.
 	authHandlers := auth.HandlerWithOptions(authService, auth.ChiServerOptions{
@@ -111,8 +119,6 @@ func run() error {
 
 	router.Handle("/api/user", authHandlers)
 	router.Handle("/api/user", rewHandlers)
-
-	logger.Info(router.Routes())
 
 	// Build HTTP server.
 	hs := &http.Server{
