@@ -24,9 +24,9 @@ type WithdrawParams struct {
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
-	// Order upload (POST /api/user/orders).
+	// Order upload (POST /api/user/orders HTTP/1.1).
 	CreateOrder(w http.ResponseWriter, r *http.Request, params PostOrderParams)
-	// Get user orders (DET /api/user/orders).
+	// Get user orders (DET /api/user/orders HTTP/1.1).
 	GetOrders(w http.ResponseWriter, r *http.Request)
 	// Get user account data (GET /api/user/balance HTTP/1.1).
 	GetAccount(w http.ResponseWriter, r *http.Request)

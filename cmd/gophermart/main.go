@@ -15,6 +15,7 @@ import (
 	"github.com/KretovDmitry/gophermart-loyalty-service/internal/auth"
 	"github.com/KretovDmitry/gophermart-loyalty-service/internal/config"
 	"github.com/KretovDmitry/gophermart-loyalty-service/internal/reward"
+	"github.com/KretovDmitry/gophermart-loyalty-service/migrations"
 	"github.com/KretovDmitry/gophermart-loyalty-service/pkg/accesslog"
 	"github.com/KretovDmitry/gophermart-loyalty-service/pkg/logger"
 	"github.com/KretovDmitry/gophermart-loyalty-service/pkg/unzip"
@@ -23,6 +24,7 @@ import (
 	"github.com/avito-tech/go-transaction-manager/trm/v2/manager"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/nanmu42/gzip"
 	sqldblogger "github.com/simukti/sqldb-logger"
@@ -59,6 +61,11 @@ func run() error {
 	// Check connectivity and DSN correctness.
 	if err = db.Ping(); err != nil {
 		return fmt.Errorf("failed to connect to the database: %w", err)
+	}
+
+	// Up all migrations for github tests.
+	if err = migrations.Up(db, cfg); err != nil {
+		return fmt.Errorf("run migrations: %w", err)
 	}
 
 	// Close connection.
