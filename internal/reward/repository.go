@@ -79,10 +79,10 @@ func (r *Repo) CreateOrder(ctx context.Context, order *order.Order) error {
 	return nil
 }
 
-func (r *Repo) GetOrdersByUserID(ctx context.Context, id int) ([]*order.Order, error) {
+func (r *Repo) GetOrdersByUserID(ctx context.Context, userID int) ([]*order.Order, error) {
 	const query = "SELECT * FROM orders WHERE user_id = $1 ORDER BY uploadet_at DESC"
 
-	rows, err := r.db.QueryContext(ctx, query, id)
+	rows, err := r.db.QueryContext(ctx, query, userID)
 	if err != nil {
 		return nil, err
 	}

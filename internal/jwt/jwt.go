@@ -5,14 +5,18 @@ import (
 	"strings"
 	"time"
 
-	"github.com/KretovDmitry/gophermart-loyalty-service/internal/models/claims"
 	"github.com/KretovDmitry/gophermart-loyalty-service/internal/models/errs"
 	"github.com/golang-jwt/jwt/v4"
 )
 
+type AuthClaims struct {
+	jwt.RegisteredClaims
+	UserID int
+}
+
 // BuildString creates a JWT string for the given user ID and token expiration time.
 func BuildString(userID int, secret string, tokenExp time.Duration) (string, error) {
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims.Auth{
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, AuthClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(tokenExp)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -30,7 +34,7 @@ func BuildString(userID int, secret string, tokenExp time.Duration) (string, err
 
 // GetUserID extracts the user ID from a JWT token.
 func GetUserID(tokenString, secret string) (int, error) {
-	claims := new(claims.Auth)
+	claims := new(AuthClaims)
 
 	tokenString = strings.TrimPrefix(tokenString, "Bearer ")
 

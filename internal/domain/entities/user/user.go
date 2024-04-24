@@ -5,13 +5,15 @@ import (
 	"time"
 )
 
+type ID int
+
 // User description. Fields aligned for the GC optimal scanning.
 type User struct {
-	UpdatedAt time.Time `db:"updated_at" json:"updated_at"`
-	CreatedAt time.Time `db:"created_at" json:"created_at"`
-	Login     string    `db:"login" json:"login"`
-	Password  string    `db:"password" json:"password"`
-	ID        int       `db:"id" json:"id"`
+	UpdatedAt time.Time
+	CreatedAt time.Time
+	Login     string
+	Password  string
+	ID        ID
 }
 
 // key is an unexported type for keys defined in this package.
