@@ -10,8 +10,13 @@ const (
 	asciiTen  = 57
 )
 
+var ErrInvalidNumber = errors.New("invalid number")
+
 // Validate returns an error if the provided string does not pass the luhn check.
 func Validate(number string) error {
+	if number == "" {
+		return ErrInvalidNumber
+	}
 	p := len(number) % 2
 	sum, err := calculateLuhnSum(number, p)
 	if err != nil {
@@ -20,7 +25,7 @@ func Validate(number string) error {
 
 	// If the total modulo 10 is not equal to 0, then the number is invalid.
 	if sum%10 != 0 {
-		return errors.New("invalid number")
+		return ErrInvalidNumber
 	}
 
 	return nil

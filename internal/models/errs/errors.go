@@ -11,6 +11,7 @@ var (
 	ErrDataConflict       = errors.New("data conflict")
 	ErrAlreadyExists      = errors.New("already exists")
 	ErrInvalidRequest     = errors.New("invalid request")
+	ErrNotEnoughFunds     = errors.New("not enough funds")
 	ErrInvalidCredentials = errors.New("invalid credentials")
 	ErrInvalidOrderNumber = errors.New("invalid order number")
 )

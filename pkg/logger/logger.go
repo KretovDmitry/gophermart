@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"runtime/debug"
+	"strings"
 	"sync"
 
 	"github.com/KretovDmitry/gophermart-loyalty-service/internal/config"
@@ -26,7 +27,7 @@ type Logger interface {
 	With(ctx context.Context, args ...interface{}) Logger
 
 	// Log implements sqldblogger.Logger interface.
-	Log(_ context.Context, level sqldblogger.Level, msg string, data map[string]interface{})
+	Log(ctx context.Context, level sqldblogger.Level, msg string, data map[string]interface{})
 
 	// Debug uses fmt.Sprint to construct and log a message at DEBUG level.
 	Debug(args ...interface{})
@@ -139,6 +140,13 @@ func (l *Log) Log(_ context.Context, level sqldblogger.Level, msg string, data m
 	i := 0
 
 	for k, v := range data {
+		if k == "query" {
+			if query, ok := v.(string); ok {
+				fields[i] = zap.String(k, formatQuery(query))
+				i++
+				continue
+			}
+		}
 		fields[i] = zap.Any(k, v)
 		i++
 	}
@@ -202,4 +210,9 @@ func getCorrelationID(req *http.Request) string {
 // getRequestID extracts the correlation ID from the HTTP request.
 func getRequestID(req *http.Request) string {
 	return req.Header.Get("X-Request-ID")
+}
+
+// formatQuery removes tabs and replaces newlines with spaces in the given query string.
+func formatQuery(q string) string {
+	return strings.ReplaceAll(strings.ReplaceAll(q, "\t", ""), "\n", " ")
 }

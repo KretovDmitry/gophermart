@@ -1,16 +1,19 @@
 package reward
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
 
 	"github.com/KretovDmitry/gophermart-loyalty-service/internal/config"
+	"github.com/KretovDmitry/gophermart-loyalty-service/internal/models/account"
 	"github.com/KretovDmitry/gophermart-loyalty-service/internal/models/errs"
 	"github.com/KretovDmitry/gophermart-loyalty-service/internal/models/order"
 	"github.com/KretovDmitry/gophermart-loyalty-service/internal/models/user"
 	"github.com/KretovDmitry/gophermart-loyalty-service/pkg/logger"
 	"github.com/avito-tech/go-transaction-manager/trm/v2/manager"
+	"github.com/shopspring/decimal"
 )
 
 type Service struct {
@@ -94,6 +97,66 @@ func (s *Service) GetAccount(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Withdraw (POST /api/user/balance/withdraw HTTP/1.1).
+func (s *Service) Withdraw(w http.ResponseWriter, r *http.Request, params WithdrawParams) {
+	u, found := user.FromContext(r.Context())
+	if !found {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	order := &order.Order{
+		UserID: u.ID,
+		Number: params.Order,
+		Status: order.NEW,
+	}
+
+	accountOperation := &account.Operation{
+		UserID: u.ID,
+		Type:   account.WITHDRAWAL,
+		Order:  params.Order,
+		Sum:    decimal.NewFromFloat(params.Sum),
+	}
+
+	var err error
+	err = s.trm.Do(r.Context(), func(ctx context.Context) error {
+		if err = s.repo.CreateOrder(ctx, order); err != nil {
+			return err
+		}
+		if err = s.repo.Witdraw(ctx, params.Sum, u.ID); err != nil {
+			return err
+		}
+		if err = s.repo.SaveAccountOperation(ctx, accountOperation); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		ErrorHandlerFunc(w, r, err)
+		return
+	}
+}
+
+// Get all user withdrawals (GET /api/user/withdrawals HTTP/1.1).
+func (s *Service) GetWithdrawals(w http.ResponseWriter, r *http.Request) {
+	u, found := user.FromContext(r.Context())
+	if !found {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	withdrawals, err := s.repo.GetWithdrawals(r.Context(), u.ID)
+	if err != nil {
+		ErrorHandlerFunc(w, r, err)
+		return
+	}
+
+	if err = json.NewEncoder(w).Encode(withdrawals); err != nil {
+		ErrorHandlerFunc(w, r, err)
+		return
+	}
+}
+
 // ErrorHandlerFunc handles sending of an error in the JSON format,
 // writing appropriate status code and handling the failure to marshal that.
 func ErrorHandlerFunc(w http.ResponseWriter, _ *http.Request, err error) {
@@ -101,23 +164,27 @@ func ErrorHandlerFunc(w http.ResponseWriter, _ *http.Request, err error) {
 	code := http.StatusInternalServerError
 
 	switch {
-	// Status OK
+	// Status OK (200).
 	case errors.Is(err, errs.ErrAlreadyExists):
 		code = http.StatusOK
 
-	// Status Bad Request.
-	case errors.Is(err, errs.ErrInvalidRequest):
-		code = http.StatusBadRequest
-
-	// Status No Content.
+	// Status No Content (204).
 	case errors.Is(err, errs.ErrNotFound):
 		code = http.StatusNoContent
 
-	// Status Conflict.
+	// Status Bad Request (400).
+	case errors.Is(err, errs.ErrInvalidRequest):
+		code = http.StatusBadRequest
+
+	// Stats Payment Required (402).
+	case errors.Is(err, errs.ErrNotEnoughFunds):
+		code = http.StatusPaymentRequired
+
+	// Status Conflict (409).
 	case errors.Is(err, errs.ErrDataConflict):
 		code = http.StatusConflict
 
-	// Status Unproccessable Entity
+	// Status Unproccessable Entity (422).
 	case errors.Is(err, errs.ErrInvalidOrderNumber):
 		code = http.StatusUnprocessableEntity
 	}

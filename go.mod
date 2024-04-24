@@ -1,6 +1,6 @@
 module github.com/KretovDmitry/gophermart-loyalty-service
 
-go 1.21.9
+go 1.22.2
 
 require (
 	github.com/avito-tech/go-transaction-manager/drivers/sql/v2 v2.0.0-rc8
