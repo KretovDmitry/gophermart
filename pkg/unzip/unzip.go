@@ -42,7 +42,7 @@ func (c *compressReader) Close() error {
 
 // Middleware decides whether or not to decompress request
 // judging by content encoding.
-func Middleware(logger logger.Logger) func(next http.Handler) http.Handler {
+func Middleware(logger logger.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		f := func(w http.ResponseWriter, r *http.Request) {
 			contentEncoding := r.Header.Get("Content-Encoding")

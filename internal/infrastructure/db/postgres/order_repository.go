@@ -75,6 +75,9 @@ func (r *OrderRepository) GetOrdersByUserID(ctx context.Context, id user.ID) ([]
 
 	rows, err := r.db.QueryContext(ctx, query, id)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errs.ErrNotFound
+		}
 		return nil, err
 	}
 
@@ -108,9 +111,44 @@ func (r *OrderRepository) GetOrdersByUserID(ctx context.Context, id user.ID) ([]
 		return nil, err
 	}
 
-	if len(orders) == 0 {
-		return nil, errs.ErrNotFound
+	return orders, nil
+}
+
+func (r *OrderRepository) GetUnprocessedOrderNumbers(
+	ctx context.Context, limit, offset int,
+) ([]entities.OrderNumber, error) {
+	const query = "SELECT number FROM orders ORDER BY id LIMIT $1 OFFSET $2;"
+
+	rows, err := r.db.QueryContext(ctx, query, limit, offset)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errs.ErrNotFound
+		}
+		return nil, err
 	}
 
-	return orders, nil
+	numbers := make([]entities.OrderNumber, 0, limit)
+
+	for rows.Next() {
+		var number entities.OrderNumber
+
+		if err = rows.Scan(&number); err != nil {
+			return nil, err
+		}
+
+		numbers = append(numbers, number)
+	}
+
+	defer func() {
+		if err = rows.Close(); err != nil {
+			r.logger.Errorf("close rows: %s", err)
+		}
+	}()
+
+	// Rows.Err will report the last error encountered by Rows.Scan.
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return numbers, nil
 }

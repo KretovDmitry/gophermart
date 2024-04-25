@@ -1,5 +1,8 @@
 dsn: "postgres://127.0.0.1/postgres?sslmode=disable&user=postgres&password=postgres"
-password_hash_cost: 14
+accrual:
+  address: "127.0.0.1:8080"
+  timeout: "10s"
+  limit: 100
 http_server:
   run_address: "127.0.0.1:8081"
   timeout: "5s"
@@ -13,5 +16,6 @@ logger:
 jwt:
   signing_key: "LxsKJywDL5O5PvgODZhBH12KE6k2yL8E"
   expiration: "24h"
+password_hash_cost: 14
 migrations_path: "."
 migrate_on_start: true

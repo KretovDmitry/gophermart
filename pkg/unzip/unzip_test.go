@@ -1,4 +1,4 @@
-package unzip
+package unzip_test
 
 import (
 	"bytes"
@@ -8,8 +8,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/KretovDmitry/gophermart/pkg/logger"
+	"github.com/KretovDmitry/gophermart/pkg/unzip"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 func TestUnzip(t *testing.T) {
@@ -44,7 +47,8 @@ func TestUnzip(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			r.Header.Set("Content-Encoding", tt.contentEncoding)
-			handler = Middleware(handler)
+			middleware := unzip.Middleware(logger.NewWithZap(zap.L()))
+			handler = middleware(handler)
 
 			handler.ServeHTTP(w, r)
 

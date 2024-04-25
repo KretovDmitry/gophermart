@@ -119,7 +119,7 @@ func (c *AccountController) Withdraw(w http.ResponseWriter, r *http.Request) {
 }
 
 // Get all user withdrawals (GET /api/user/withdrawals HTTP/1.1).
-func (s *AccountController) GetWithdrawals(w http.ResponseWriter, r *http.Request) {
+func (c *AccountController) GetWithdrawals(w http.ResponseWriter, r *http.Request) {
 	// Get user from context.
 	user, found := user.FromContext(r.Context())
 	if !found {
@@ -128,9 +128,9 @@ func (s *AccountController) GetWithdrawals(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Get all withdrawals made by the user.
-	withdrawals, err := s.service.GetWithdrawals(r.Context(), user.ID)
+	withdrawals, err := c.service.GetWithdrawals(r.Context(), user.ID)
 	if err != nil {
-		s.ErrorHandlerFunc(w, r, err)
+		c.ErrorHandlerFunc(w, r, err)
 		return
 	}
 
@@ -142,7 +142,7 @@ func (s *AccountController) GetWithdrawals(w http.ResponseWriter, r *http.Reques
 
 	// Encode them. Status 200 OK.
 	if err = json.NewEncoder(w).Encode(res); err != nil {
-		s.ErrorHandlerFunc(w, r, err)
+		c.ErrorHandlerFunc(w, r, err)
 		return
 	}
 }

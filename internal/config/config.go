@@ -14,18 +14,26 @@ type (
 	Config struct {
 		// The data source name (DSN) for connecting to the database.
 		DSN string `yaml:"dsn" env:"DATABASE_URI"`
-		// The address of the accural system server.
-		AccrualAddr string `yaml:"accrual_addr" env:"ACCRUAL_SYSTEM_ADDRESS"`
 		// Subconfigs.
+		Accrual    Accrual    `yaml:"accrual"`
 		HTTPServer HTTPServer `yaml:"http_server"`
 		JWT        JWT        `yaml:"jwt"`
 		Logger     Logger     `yaml:"logger"`
 		// Cost to hash the password . Must be grater than 3.
 		PasswordHashCost int `yaml:"password_hash_cost" env-default:"14"`
-		// Allows set env var locally to not run migration.
+		// Allows set env var locally to not run migrations.
 		MigrateOnStart bool `yaml:"migrate_on_start" env:"MIGRATE_ON_START"`
 		// Path to migrations.
 		Migrations string `yaml:"migrations_path"`
+	}
+	// Config for interaction with accrual service.
+	Accrual struct {
+		// The address of the accural server.
+		Address string `yaml:"address" env:"ACCRUAL_SYSTEM_ADDRESS"`
+		// Client timeout.
+		Timeout time.Duration `yaml:"timeout" env-default:"10s"`
+		// DB read limit.
+		Limit int `yaml:"limit"`
 	}
 	// Config for HTTP server.
 	HTTPServer struct {
@@ -89,7 +97,7 @@ func MustLoad() *Config {
 	// Read given flags. If not provided use file values.
 	flag.StringVar(&cfg.HTTPServer.Address, "a", cfg.HTTPServer.Address, "server startup address")
 	flag.StringVar(&cfg.DSN, "d", cfg.DSN, "server data source name")
-	flag.StringVar(&cfg.AccrualAddr, "r", cfg.AccrualAddr, "server address of the accural system")
+	flag.StringVar(&cfg.Accrual.Address, "r", cfg.Accrual.Address, "server address of the accural system")
 	flag.Parse()
 
 	// Read environment variables.

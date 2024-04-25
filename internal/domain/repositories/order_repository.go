@@ -10,4 +10,5 @@ import (
 type OrderRepository interface {
 	CreateOrder(context.Context, user.ID, entities.OrderNumber) error
 	GetOrdersByUserID(context.Context, user.ID) ([]*entities.Order, error)
+	GetUnprocessedOrderNumbers(ctx context.Context, limit, offset int) ([]entities.OrderNumber, error)
 }

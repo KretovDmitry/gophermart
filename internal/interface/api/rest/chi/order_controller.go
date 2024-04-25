@@ -87,7 +87,7 @@ func (c *OrderController) CreateOrder(w http.ResponseWriter, r *http.Request) {
 }
 
 // Get user orders (GET /api/user/orders HTTP/1.1).
-func (s *OrderController) GetOrders(w http.ResponseWriter, r *http.Request) {
+func (c *OrderController) GetOrders(w http.ResponseWriter, r *http.Request) {
 	// Get user from context.
 	user, found := user.FromContext(r.Context())
 	if !found {
@@ -96,9 +96,9 @@ func (s *OrderController) GetOrders(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get all orders for the user.
-	orders, err := s.service.GetOrders(r.Context(), user.ID)
+	orders, err := c.service.GetOrders(r.Context(), user.ID)
 	if err != nil {
-		s.ErrorHandlerFunc(w, r, err)
+		c.ErrorHandlerFunc(w, r, err)
 		return
 	}
 
@@ -110,7 +110,7 @@ func (s *OrderController) GetOrders(w http.ResponseWriter, r *http.Request) {
 
 	// Encode and return them. Status 200.
 	if err = json.NewEncoder(w).Encode(res); err != nil {
-		s.ErrorHandlerFunc(w, r, err)
+		c.ErrorHandlerFunc(w, r, err)
 		return
 	}
 }
