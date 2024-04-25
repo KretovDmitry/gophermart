@@ -3,9 +3,9 @@ package interfaces
 import (
 	"context"
 
-	"github.com/KretovDmitry/gophermart-loyalty-service/internal/application/params"
-	"github.com/KretovDmitry/gophermart-loyalty-service/internal/domain/entities"
-	"github.com/KretovDmitry/gophermart-loyalty-service/internal/domain/entities/user"
+	"github.com/KretovDmitry/gophermart/internal/application/params"
+	"github.com/KretovDmitry/gophermart/internal/domain/entities"
+	"github.com/KretovDmitry/gophermart/internal/domain/entities/user"
 )
 
 // AccountService represents all service actions.

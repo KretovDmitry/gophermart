@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/KretovDmitry/gophermart-loyalty-service/pkg/logger"
+	"github.com/KretovDmitry/gophermart/pkg/logger"
 	"github.com/go-chi/chi/v5/middleware"
 )
 

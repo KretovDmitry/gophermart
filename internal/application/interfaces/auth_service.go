@@ -3,7 +3,7 @@ package interfaces
 import (
 	"context"
 
-	"github.com/KretovDmitry/gophermart-loyalty-service/internal/domain/entities/user"
+	"github.com/KretovDmitry/gophermart/internal/domain/entities/user"
 )
 
 // AuthService represents all service actions.

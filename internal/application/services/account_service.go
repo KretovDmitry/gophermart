@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 
-	"github.com/KretovDmitry/gophermart-loyalty-service/internal/application/interfaces"
-	"github.com/KretovDmitry/gophermart-loyalty-service/internal/application/params"
-	"github.com/KretovDmitry/gophermart-loyalty-service/internal/domain/entities"
-	"github.com/KretovDmitry/gophermart-loyalty-service/internal/domain/entities/user"
-	"github.com/KretovDmitry/gophermart-loyalty-service/internal/domain/repositories"
-	"github.com/KretovDmitry/gophermart-loyalty-service/pkg/logger"
+	"github.com/KretovDmitry/gophermart/internal/application/interfaces"
+	"github.com/KretovDmitry/gophermart/internal/application/params"
+	"github.com/KretovDmitry/gophermart/internal/domain/entities"
+	"github.com/KretovDmitry/gophermart/internal/domain/entities/user"
+	"github.com/KretovDmitry/gophermart/internal/domain/repositories"
+	"github.com/KretovDmitry/gophermart/pkg/logger"
 	"github.com/avito-tech/go-transaction-manager/trm/v2/manager"
 )
 

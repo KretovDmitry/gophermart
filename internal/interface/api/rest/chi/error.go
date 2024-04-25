@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/KretovDmitry/gophermart-loyalty-service/internal/application/errs"
+	"github.com/KretovDmitry/gophermart/internal/application/errs"
 )
 
 func checkJSONDecodeError(err error) error {

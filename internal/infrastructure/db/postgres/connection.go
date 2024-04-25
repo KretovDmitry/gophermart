@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/KretovDmitry/gophermart-loyalty-service/pkg/logger"
+	"github.com/KretovDmitry/gophermart/pkg/logger"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	sqldblogger "github.com/simukti/sqldb-logger"
 )

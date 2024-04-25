@@ -5,11 +5,11 @@ import (
 	"database/sql"
 	"errors"
 
-	"github.com/KretovDmitry/gophermart-loyalty-service/internal/application/errs"
-	"github.com/KretovDmitry/gophermart-loyalty-service/internal/domain/entities"
-	"github.com/KretovDmitry/gophermart-loyalty-service/internal/domain/entities/user"
-	"github.com/KretovDmitry/gophermart-loyalty-service/internal/domain/repositories"
-	"github.com/KretovDmitry/gophermart-loyalty-service/pkg/logger"
+	"github.com/KretovDmitry/gophermart/internal/application/errs"
+	"github.com/KretovDmitry/gophermart/internal/domain/entities"
+	"github.com/KretovDmitry/gophermart/internal/domain/entities/user"
+	"github.com/KretovDmitry/gophermart/internal/domain/repositories"
+	"github.com/KretovDmitry/gophermart/pkg/logger"
 	trmsql "github.com/avito-tech/go-transaction-manager/drivers/sql/v2"
 	"github.com/shopspring/decimal"
 )

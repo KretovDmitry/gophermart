@@ -11,7 +11,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/KretovDmitry/gophermart-loyalty-service/internal/config"
+	"github.com/KretovDmitry/gophermart/internal/config"
 	"github.com/google/uuid"
 	sqldblogger "github.com/simukti/sqldb-logger"
 	"go.uber.org/zap"

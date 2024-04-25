@@ -1,7 +1,7 @@
 package entities
 
 import (
-	"github.com/KretovDmitry/gophermart-loyalty-service/internal/domain/entities/user"
+	"github.com/KretovDmitry/gophermart/internal/domain/entities/user"
 	"github.com/shopspring/decimal"
 )
 

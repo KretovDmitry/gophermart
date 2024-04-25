@@ -5,7 +5,7 @@ import (
 	"embed"
 	"fmt"
 
-	"github.com/KretovDmitry/gophermart-loyalty-service/internal/config"
+	"github.com/KretovDmitry/gophermart/internal/config"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"

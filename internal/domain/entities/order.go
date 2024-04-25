@@ -3,9 +3,9 @@ package entities
 import (
 	"time"
 
-	"github.com/KretovDmitry/gophermart-loyalty-service/internal/application/errs"
-	"github.com/KretovDmitry/gophermart-loyalty-service/internal/domain/entities/user"
-	"github.com/KretovDmitry/gophermart-loyalty-service/pkg/luhn"
+	"github.com/KretovDmitry/gophermart/internal/application/errs"
+	"github.com/KretovDmitry/gophermart/internal/domain/entities/user"
+	"github.com/KretovDmitry/gophermart/pkg/luhn"
 	"github.com/shopspring/decimal"
 )
 

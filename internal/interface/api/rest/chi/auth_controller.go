@@ -7,10 +7,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/KretovDmitry/gophermart-loyalty-service/internal/application/errs"
-	"github.com/KretovDmitry/gophermart-loyalty-service/internal/application/interfaces"
-	"github.com/KretovDmitry/gophermart-loyalty-service/internal/interface/api/rest/header"
-	"github.com/KretovDmitry/gophermart-loyalty-service/internal/interface/api/rest/request"
+	"github.com/KretovDmitry/gophermart/internal/application/errs"
+	"github.com/KretovDmitry/gophermart/internal/application/interfaces"
+	"github.com/KretovDmitry/gophermart/internal/interface/api/rest/header"
+	"github.com/KretovDmitry/gophermart/internal/interface/api/rest/request"
 	"github.com/go-chi/chi/v5"
 )
 

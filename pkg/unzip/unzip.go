@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/KretovDmitry/gophermart-loyalty-service/pkg/logger"
+	"github.com/KretovDmitry/gophermart/pkg/logger"
 )
 
 // compressReader implements ReadCloser interface

@@ -3,9 +3,9 @@ package rest
 import (
 	"net/http"
 
-	"github.com/KretovDmitry/gophermart-loyalty-service/pkg/accesslog"
-	"github.com/KretovDmitry/gophermart-loyalty-service/pkg/logger"
-	"github.com/KretovDmitry/gophermart-loyalty-service/pkg/unzip"
+	"github.com/KretovDmitry/gophermart/pkg/accesslog"
+	"github.com/KretovDmitry/gophermart/pkg/logger"
+	"github.com/KretovDmitry/gophermart/pkg/unzip"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/nanmu42/gzip"

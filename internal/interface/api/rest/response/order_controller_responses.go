@@ -3,7 +3,7 @@ package response
 import (
 	"time"
 
-	"github.com/KretovDmitry/gophermart-loyalty-service/internal/domain/entities"
+	"github.com/KretovDmitry/gophermart/internal/domain/entities"
 	"github.com/shopspring/decimal"
 )
 
