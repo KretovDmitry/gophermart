@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"log"
@@ -12,22 +11,18 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/KretovDmitry/gophermart-loyalty-service/internal/auth"
+	"github.com/KretovDmitry/gophermart-loyalty-service/internal/application/services"
 	"github.com/KretovDmitry/gophermart-loyalty-service/internal/config"
-	"github.com/KretovDmitry/gophermart-loyalty-service/internal/reward"
+	"github.com/KretovDmitry/gophermart-loyalty-service/internal/infrastructure/db/postgres"
+	rest "github.com/KretovDmitry/gophermart-loyalty-service/internal/interface/api/rest/chi"
+	"github.com/KretovDmitry/gophermart-loyalty-service/internal/interface/api/rest/middleware"
 	"github.com/KretovDmitry/gophermart-loyalty-service/migrations"
-	"github.com/KretovDmitry/gophermart-loyalty-service/pkg/accesslog"
 	"github.com/KretovDmitry/gophermart-loyalty-service/pkg/logger"
-	"github.com/KretovDmitry/gophermart-loyalty-service/pkg/unzip"
 	trmsql "github.com/avito-tech/go-transaction-manager/drivers/sql/v2"
 	trmcontext "github.com/avito-tech/go-transaction-manager/trm/v2/context"
 	"github.com/avito-tech/go-transaction-manager/trm/v2/manager"
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	_ "github.com/jackc/pgx/v5/stdlib"
-	"github.com/nanmu42/gzip"
-	sqldblogger "github.com/simukti/sqldb-logger"
 )
 
 // Version indicates the current version of the application.
@@ -50,17 +45,10 @@ func run() error {
 	// Create root logger tagged with server version.
 	logger := logger.New(cfg).With(serverCtx, "version", Version)
 
-	db, err := sql.Open("pgx", cfg.DSN)
+	// Connect to postgres.
+	db, err := postgres.Connect(cfg.DSN, logger)
 	if err != nil {
-		return fmt.Errorf("failed to open the database: %w", err)
-	}
-
-	// Log every query to the database.
-	db = sqldblogger.OpenDriver(cfg.DSN, db.Driver(), logger)
-
-	// Check connectivity and DSN correctness.
-	if err = db.Ping(); err != nil {
-		return fmt.Errorf("failed to connect to the database: %w", err)
+		return fmt.Errorf("postgres connect: %w", err)
 	}
 
 	// Up all migrations for github tests.
@@ -82,50 +70,56 @@ func run() error {
 		manager.WithCtxManager(trmcontext.DefaultManager),
 	)
 
-	// Init repository for auth service.
-	authRepo, err := auth.NewRepository(db, trmsql.DefaultCtxGetter, logger)
+	// Init repos.
+	userRepo, err := postgres.NewUserRepository(db, trmsql.DefaultCtxGetter, logger)
 	if err != nil {
-		return fmt.Errorf("failed to init auth repository: %w", err)
+		return fmt.Errorf("failed to init user repository: %w", err)
+	}
+	accountRepo, err := postgres.NewAccountRepository(db, trmsql.DefaultCtxGetter, logger)
+	if err != nil {
+		return fmt.Errorf("failed to init account repository: %w", err)
+	}
+	orderRepo, err := postgres.NewOrderRepository(db, trmsql.DefaultCtxGetter, logger)
+	if err != nil {
+		return fmt.Errorf("failed to order account repository: %w", err)
 	}
 
-	// Init auth service.
-	authService, err := auth.NewService(authRepo, trManager, logger, cfg)
+	// Init services.
+	authService, err := services.NewAuthService(userRepo, accountRepo, trManager, logger, cfg)
 	if err != nil {
 		return fmt.Errorf("failed to init auth service: %w", err)
 	}
-
-	// Init repository for reward service.
-	rewardRepo, err := reward.NewRepository(db, trmsql.DefaultCtxGetter, logger)
+	accountService, err := services.NewAccountService(accountRepo, orderRepo, trManager, logger)
 	if err != nil {
-		return fmt.Errorf("failed to init reward repository: %w", err)
+		return fmt.Errorf("failed to init account service: %w", err)
 	}
-
-	// Init reward service.
-	rewardService, err := reward.NewService(rewardRepo, trManager, logger, cfg)
+	orderService, err := services.NewOrderService(orderRepo, logger)
 	if err != nil {
-		return fmt.Errorf("failed to init banner service: %w", err)
+		return fmt.Errorf("failed to init order service: %w", err)
 	}
 
 	// Create root router.
-	router := initRootRouter(logger)
+	router := rest.InitChi(logger)
 
 	// Init and group handlers for auth routes.
-	authHandlers := auth.HandlerWithOptions(authService, auth.ChiServerOptions{
-		BaseURL:          "/api/user",
-		BaseRouter:       router,
-		ErrorHandlerFunc: auth.ErrorHandlerFunc,
+	rest.NewAuthController(authService, cfg.JWT.Expiration, rest.ChiServerOptions{
+		BaseURL:    "/api/user",
+		BaseRouter: router,
 	})
 
-	// Init handlers for reward routes.
-	rewHandlers := reward.HandlerWithOptions(rewardService, reward.ChiServerOptions{
-		BaseURL:          "/api/user",
-		BaseRouter:       router,
-		Middlewares:      []reward.MiddlewareFunc{authService.Middleware},
-		ErrorHandlerFunc: reward.ErrorHandlerFunc,
+	// Init and group handlers for order routes.
+	rest.NewOrderController(orderService, rest.ChiServerOptions{
+		BaseURL:     "/api/user",
+		BaseRouter:  router,
+		Middlewares: []rest.MiddlewareFunc{middleware.Middleware(authService)},
 	})
 
-	router.Handle("/api/user", authHandlers)
-	router.Handle("/api/user", rewHandlers)
+	// Init and group handlers for account routes.
+	rest.NewAccountController(accountService, rest.ChiServerOptions{
+		BaseURL:     "/api/user",
+		BaseRouter:  router,
+		Middlewares: []rest.MiddlewareFunc{middleware.Middleware(authService)},
+	})
 
 	// Build HTTP server.
 	hs := &http.Server{
@@ -167,14 +161,4 @@ func run() error {
 	}
 
 	return nil
-}
-
-func initRootRouter(logger logger.Logger) *chi.Mux {
-	router := chi.NewRouter()
-	router.Use(accesslog.Handler(logger))
-	router.Use(middleware.Recoverer)
-	router.Use(gzip.DefaultHandler().WrapHandler)
-	router.Use(unzip.Middleware(logger))
-
-	return router
 }

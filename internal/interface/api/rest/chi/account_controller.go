@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 
 	"github.com/KretovDmitry/gophermart-loyalty-service/internal/application/errs"
@@ -23,8 +22,8 @@ type AccountController struct {
 	service interfaces.AccountService
 }
 
-// NewAccountController creates http.Handler with additional options.
-func NewAccountController(service interfaces.AccountService, options ChiServerOptions) http.Handler {
+// NewAccountController registers http.Handlers with additional options.
+func NewAccountController(service interfaces.AccountService, options ChiServerOptions) {
 	r := options.BaseRouter
 
 	if r == nil {
@@ -43,12 +42,10 @@ func NewAccountController(service interfaces.AccountService, options ChiServerOp
 		r.Post(options.BaseURL+"/balance/withdraw", c.Withdraw)
 		r.Get(options.BaseURL+"/withdrawals", c.GetWithdrawals)
 	})
-
-	return r
 }
 
 // Get user balance (GET /api/user/balance HTTP/1.1).
-func (s *AccountController) GetBalance(w http.ResponseWriter, r *http.Request) {
+func (c *AccountController) GetBalance(w http.ResponseWriter, r *http.Request) {
 	// Get user from context.
 	user, found := user.FromContext(r.Context())
 	if !found {
@@ -57,18 +54,18 @@ func (s *AccountController) GetBalance(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get user's account.
-	account, err := s.service.GetAccount(r.Context(), user.ID)
+	account, err := c.service.GetAccount(r.Context(), user.ID)
 	if err != nil {
-		s.ErrorHandlerFunc(w, r, err)
+		c.ErrorHandlerFunc(w, r, err)
 		return
 	}
 
 	// Create response payload.
-	response := response.NewGetBalance(account.Balance, account.Withdrawn)
+	response := response.NewGetBalance(account)
 
 	// Encode and return. Status 200.
 	if err = json.NewEncoder(w).Encode(response); err != nil {
-		s.ErrorHandlerFunc(w, r, err)
+		c.ErrorHandlerFunc(w, r, err)
 		return
 	}
 }
@@ -87,19 +84,7 @@ func (c *AccountController) Withdraw(w http.ResponseWriter, r *http.Request) {
 	var payload request.Withdraw
 
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		var e *json.UnmarshalTypeError
-		if errors.As(err, &e) {
-			c.ErrorHandlerFunc(w, r, fmt.Errorf(
-				"%w: %s must be of type %s, got %s",
-				errs.ErrInvalidRequest, e.Field, e.Type, e.Value),
-			)
-			return
-		}
-		if errors.Is(err, io.EOF) {
-			c.ErrorHandlerFunc(w, r, fmt.Errorf("%w: empty body", errs.ErrInvalidRequest))
-			return
-		}
-		c.ErrorHandlerFunc(w, r, err)
+		c.ErrorHandlerFunc(w, r, checkJSONDecodeError(err))
 		return
 	}
 
@@ -142,13 +127,21 @@ func (s *AccountController) GetWithdrawals(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	// Get all withdrawals made by the user.
 	withdrawals, err := s.service.GetWithdrawals(r.Context(), user.ID)
 	if err != nil {
 		s.ErrorHandlerFunc(w, r, err)
 		return
 	}
 
-	if err = json.NewEncoder(w).Encode(withdrawals); err != nil {
+	// Convert entities to handler response representation.
+	res := make([]*response.GetWithdrawals, len(withdrawals))
+	for i, w := range withdrawals {
+		res[i] = response.NewGetWithdrawals(w)
+	}
+
+	// Encode them. Status 200 OK.
+	if err = json.NewEncoder(w).Encode(res); err != nil {
 		s.ErrorHandlerFunc(w, r, err)
 		return
 	}

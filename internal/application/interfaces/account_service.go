@@ -8,6 +8,7 @@ import (
 	"github.com/KretovDmitry/gophermart-loyalty-service/internal/domain/entities/user"
 )
 
+// AccountService represents all service actions.
 type AccountService interface {
 	GetAccount(context.Context, user.ID) (*entities.Account, error)
 	Withdraw(context.Context, *params.Withdraw) error

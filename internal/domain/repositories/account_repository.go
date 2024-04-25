@@ -9,8 +9,9 @@ import (
 )
 
 type AccountRepository interface {
+	CreateAccount(context.Context, user.ID) error
 	GetAccountByUserID(context.Context, user.ID) (*entities.Account, error)
-	Withdraw(ctx context.Context, sum decimal.Decimal, userID user.ID) error
-	GetWithdrawals(context.Context, user.ID) ([]*entities.Withdrawal, error)
+	Withdraw(context.Context, user.ID, decimal.Decimal) error
+	GetWithdrawalsByUserID(context.Context, user.ID) ([]*entities.Withdrawal, error)
 	SaveAccountOperation(context.Context, *entities.Operation) error
 }

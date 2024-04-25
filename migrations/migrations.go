@@ -17,6 +17,9 @@ import (
 var fs embed.FS
 
 func Up(db *sql.DB, cfg *config.Config) error {
+	if !cfg.MigrateOnStart {
+		return nil
+	}
 	d, err := iofs.New(fs, cfg.Migrations)
 	if err != nil {
 		return fmt.Errorf("failed to init io/fs driver: %w", err)

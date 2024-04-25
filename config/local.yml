@@ -14,3 +14,4 @@ jwt:
   signing_key: "LxsKJywDL5O5PvgODZhBH12KE6k2yL8E"
   expiration: "24h"
 migrations_path: "."
+migrate_on_start: true

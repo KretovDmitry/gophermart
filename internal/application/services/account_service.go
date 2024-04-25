@@ -6,7 +6,6 @@ import (
 
 	"github.com/KretovDmitry/gophermart-loyalty-service/internal/application/interfaces"
 	"github.com/KretovDmitry/gophermart-loyalty-service/internal/application/params"
-	"github.com/KretovDmitry/gophermart-loyalty-service/internal/config"
 	"github.com/KretovDmitry/gophermart-loyalty-service/internal/domain/entities"
 	"github.com/KretovDmitry/gophermart-loyalty-service/internal/domain/entities/user"
 	"github.com/KretovDmitry/gophermart-loyalty-service/internal/domain/repositories"
@@ -19,7 +18,6 @@ type AccountService struct {
 	orderRepo   repositories.OrderRepository
 	trm         *manager.Manager
 	logger      logger.Logger
-	config      *config.Config
 }
 
 func NewAccountService(
@@ -27,11 +25,7 @@ func NewAccountService(
 	orderRepository repositories.OrderRepository,
 	trm *manager.Manager,
 	logger logger.Logger,
-	config *config.Config,
 ) (*AccountService, error) {
-	if config == nil {
-		return nil, errors.New("nil dependency: config")
-	}
 	if trm == nil {
 		return nil, errors.New("nil dependency: transaction manager")
 	}
@@ -40,7 +34,6 @@ func NewAccountService(
 		orderRepo:   orderRepository,
 		trm:         trm,
 		logger:      logger,
-		config:      config,
 	}, nil
 }
 
@@ -59,12 +52,13 @@ func (s *AccountService) Withdraw(ctx context.Context, params *params.Withdraw) 
 	return s.trm.Do(ctx, func(ctx context.Context) error {
 		var err error
 
+		// Createe new order.
 		if err = s.orderRepo.CreateOrder(ctx, params.UserID, params.Order); err != nil {
 			return err
 		}
 
 		// Withdraw funds to the account of the new order.
-		if err = s.accountRepo.Withdraw(ctx, params.Sum, params.UserID); err != nil {
+		if err = s.accountRepo.Withdraw(ctx, params.UserID, params.Sum); err != nil {
 			return err
 		}
 
@@ -80,7 +74,7 @@ func (s *AccountService) Withdraw(ctx context.Context, params *params.Withdraw) 
 }
 
 func (s *AccountService) GetWithdrawals(ctx context.Context, id user.ID) ([]*entities.Withdrawal, error) {
-	withdrawals, err := s.accountRepo.GetWithdrawals(ctx, id)
+	withdrawals, err := s.accountRepo.GetWithdrawalsByUserID(ctx, id)
 	if err != nil {
 		return nil, err
 	}

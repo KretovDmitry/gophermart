@@ -1,4 +1,4 @@
-package auth
+package postgres
 
 import (
 	"context"
@@ -6,28 +6,22 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/KretovDmitry/gophermart-loyalty-service/internal/models/errs"
-	"github.com/KretovDmitry/gophermart-loyalty-service/internal/models/user"
+	"github.com/KretovDmitry/gophermart-loyalty-service/internal/application/errs"
+	"github.com/KretovDmitry/gophermart-loyalty-service/internal/domain/entities/user"
+	"github.com/KretovDmitry/gophermart-loyalty-service/internal/domain/repositories"
 	"github.com/KretovDmitry/gophermart-loyalty-service/pkg/logger"
 	trmsql "github.com/avito-tech/go-transaction-manager/drivers/sql/v2"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-type Repository interface {
-	GetUserByID(ctx context.Context, userID int) (*user.User, error)
-	GetUserByLogin(ctx context.Context, login string) (*user.User, error)
-	CreateUser(ctx context.Context, login, password string) (id int, err error)
-	CreateAccount(ctx context.Context, userID int) error
-}
-
-type Repo struct {
+type UserRepository struct {
 	db     *sql.DB
 	getter *trmsql.CtxGetter
 	logger logger.Logger
 }
 
-func NewRepository(db *sql.DB, getter *trmsql.CtxGetter, logger logger.Logger) (*Repo, error) {
+func NewUserRepository(db *sql.DB, getter *trmsql.CtxGetter, logger logger.Logger) (*UserRepository, error) {
 	if db == nil {
 		return nil, errors.New("nil dependency: database")
 	}
@@ -35,17 +29,17 @@ func NewRepository(db *sql.DB, getter *trmsql.CtxGetter, logger logger.Logger) (
 		return nil, errors.New("nil dependency: transaction getter")
 	}
 
-	return &Repo{db: db, getter: getter, logger: logger}, nil
+	return &UserRepository{db: db, getter: getter, logger: logger}, nil
 }
 
-var _ Repository = (*Repo)(nil)
+var _ repositories.UserRepository = (*UserRepository)(nil)
 
-func (r *Repo) GetUserByID(ctx context.Context, userID int) (*user.User, error) {
+func (r *UserRepository) GetUserByID(ctx context.Context, id user.ID) (*user.User, error) {
 	const query = "SELECT * FROM users WHERE id = $1"
 
 	u := new(user.User)
 
-	err := r.db.QueryRowContext(ctx, query, userID).Scan(
+	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&u.ID,
 		&u.Login,
 		&u.Password,
@@ -62,7 +56,7 @@ func (r *Repo) GetUserByID(ctx context.Context, userID int) (*user.User, error) 
 	return u, nil
 }
 
-func (r *Repo) GetUserByLogin(ctx context.Context, login string) (*user.User, error) {
+func (r *UserRepository) GetUserByLogin(ctx context.Context, login string) (*user.User, error) {
 	const query = "SELECT * FROM users WHERE login = $1"
 
 	u := new(user.User)
@@ -84,32 +78,21 @@ func (r *Repo) GetUserByLogin(ctx context.Context, login string) (*user.User, er
 	return u, nil
 }
 
-func (r *Repo) CreateUser(ctx context.Context, login, password string) (int, error) {
+func (r *UserRepository) CreateUser(ctx context.Context, login, password string) (user.ID, error) {
 	const query = "INSERT INTO users (login, password) VALUES ($1, $2) RETURNING id"
 
-	var id int
+	var id user.ID
 
 	err := r.getter.DefaultTrOrDB(ctx, r.db).QueryRowContext(ctx, query, login, password).Scan(&id)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) {
 			if pgErr.Code == pgerrcode.UniqueViolation {
-				return -1, errs.ErrDataConflict
+				return -1, fmt.Errorf("%w: login %q already exists", errs.ErrDataConflict, login)
 			}
 		}
 		return -1, fmt.Errorf("create user: %w", err)
 	}
 
 	return id, nil
-}
-
-func (r *Repo) CreateAccount(ctx context.Context, userID int) error {
-	const query = "INSERT INTO accounts (user_id) VALUES ($1)"
-
-	_, err := r.getter.DefaultTrOrDB(ctx, r.db).ExecContext(ctx, query, userID)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }

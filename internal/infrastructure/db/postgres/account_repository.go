@@ -51,7 +51,7 @@ func (r *AccountRepository) GetAccountByUserID(ctx context.Context, id user.ID) 
 	return account, nil
 }
 
-func (r *AccountRepository) Withdraw(ctx context.Context, sum decimal.Decimal, userID user.ID) error {
+func (r *AccountRepository) Withdraw(ctx context.Context, userID user.ID, sum decimal.Decimal) error {
 	const query = `
 		UPDATE accounts SET 
 			balance = balance - $1,
@@ -89,7 +89,7 @@ func (r *AccountRepository) SaveAccountOperation(ctx context.Context, op *entiti
 	return nil
 }
 
-func (r *AccountRepository) GetWithdrawals(ctx context.Context, id user.ID) ([]*entities.Withdrawal, error) {
+func (r *AccountRepository) GetWithdrawalsByUserID(ctx context.Context, id user.ID) ([]*entities.Withdrawal, error) {
 	const query = `
 		SELECT order_number, sum, processed_at FROM account_operations
 		WHERE operation = 'WITHDRAWAL' AND account_id = (
@@ -135,4 +135,15 @@ func (r *AccountRepository) GetWithdrawals(ctx context.Context, id user.ID) ([]*
 	}
 
 	return withdrawals, nil
+}
+
+func (r *AccountRepository) CreateAccount(ctx context.Context, id user.ID) error {
+	const query = "INSERT INTO accounts (user_id) VALUES ($1)"
+
+	_, err := r.getter.DefaultTrOrDB(ctx, r.db).ExecContext(ctx, query, id)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

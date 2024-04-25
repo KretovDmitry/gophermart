@@ -1,6 +1,8 @@
 package rest
 
 import (
+	"net/http"
+
 	"github.com/KretovDmitry/gophermart-loyalty-service/pkg/accesslog"
 	"github.com/KretovDmitry/gophermart-loyalty-service/pkg/logger"
 	"github.com/KretovDmitry/gophermart-loyalty-service/pkg/unzip"
@@ -19,8 +21,12 @@ func InitChi(logger logger.Logger) *chi.Mux {
 	return router
 }
 
-type ChiServerOptions struct {
-	BaseRouter  chi.Router
-	BaseURL     string
-	Middlewares []MiddlewareFunc
-}
+type (
+	MiddlewareFunc func(http.Handler) http.Handler
+
+	ChiServerOptions struct {
+		BaseRouter  chi.Router
+		BaseURL     string
+		Middlewares []MiddlewareFunc
+	}
+)

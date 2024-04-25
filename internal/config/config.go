@@ -22,6 +22,8 @@ type (
 		Logger     Logger     `yaml:"logger"`
 		// Cost to hash the password . Must be grater than 3.
 		PasswordHashCost int `yaml:"password_hash_cost" env-default:"14"`
+		// Allows set env var locally to not run migration.
+		MigrateOnStart bool `yaml:"migrate_on_start" env:"MIGRATE_ON_START"`
 		// Path to migrations.
 		Migrations string `yaml:"migrations_path"`
 	}

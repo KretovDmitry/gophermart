@@ -12,6 +12,7 @@ import (
 	"github.com/KretovDmitry/gophermart-loyalty-service/internal/domain/entities"
 	"github.com/KretovDmitry/gophermart-loyalty-service/internal/domain/entities/user"
 	"github.com/KretovDmitry/gophermart-loyalty-service/internal/interface/api/rest/header"
+	"github.com/KretovDmitry/gophermart-loyalty-service/internal/interface/api/rest/response"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -19,7 +20,7 @@ type OrderController struct {
 	service interfaces.OrderService
 }
 
-// NewOrderController creates http.Handler with additional options.
+// NewOrderController registers http.Handlers with additional options.
 func NewOrderController(service interfaces.OrderService, options ChiServerOptions) {
 	r := options.BaseRouter
 
@@ -39,8 +40,6 @@ func NewOrderController(service interfaces.OrderService, options ChiServerOption
 		r.Get(options.BaseURL+"/orders", c.GetOrders)
 	})
 }
-
-type MiddlewareFunc func(http.Handler) http.Handler
 
 // Create new order (POST /api/user/orders HTTP1.1).
 func (c *OrderController) CreateOrder(w http.ResponseWriter, r *http.Request) {
@@ -78,7 +77,7 @@ func (c *OrderController) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create order.
-	if err := c.service.CreateOrder(r.Context(), user.ID, orderNumber); err != nil {
+	if err = c.service.CreateOrder(r.Context(), user.ID, orderNumber); err != nil {
 		c.ErrorHandlerFunc(w, r, err)
 		return
 	}
@@ -103,8 +102,14 @@ func (s *OrderController) GetOrders(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Convert entities to handler response representation.
+	res := make([]*response.GetOrders, len(orders))
+	for i, order := range orders {
+		res[i] = response.NewGetOrdersFromOrderEntity(order)
+	}
+
 	// Encode and return them. Status 200.
-	if err = json.NewEncoder(w).Encode(orders); err != nil {
+	if err = json.NewEncoder(w).Encode(res); err != nil {
 		s.ErrorHandlerFunc(w, r, err)
 		return
 	}
@@ -118,6 +123,10 @@ func (c *OrderController) ErrorHandlerFunc(w http.ResponseWriter, _ *http.Reques
 
 	switch {
 	// Status OK (200).
+	// I used this error to distinguish between an attempt to create the same
+	// order by the same user in which case we should return 200 OK and
+	// actually the first time new order creation when status 202
+	// Accepted is returned (method return nil err in this case).
 	case errors.Is(err, errs.ErrAlreadyExists):
 		code = http.StatusOK
 
