@@ -154,7 +154,7 @@ func (s *AccrualService) update(ctx context.Context, num entities.OrderNumber) e
 }
 
 func (s *AccrualService) get(ctx context.Context, num entities.OrderNumber) (*entities.UpdateOrderInfo, error) {
-	url := fmt.Sprintf("http://%s/api/orders/%s", s.config.Accrual.Address, num)
+	url := fmt.Sprintf("%s/api/orders/%s", s.config.Accrual.Address, num)
 
 	s.logger.Debugf("doing request for: %s", url)
 
