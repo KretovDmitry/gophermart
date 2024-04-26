@@ -14,4 +14,5 @@ type AccountRepository interface {
 	Withdraw(context.Context, user.ID, decimal.Decimal) error
 	GetWithdrawalsByUserID(context.Context, user.ID) ([]*entities.Withdrawal, error)
 	SaveAccountOperation(context.Context, *entities.Operation) error
+	AddToAccount(context.Context, user.ID, decimal.Decimal) error
 }

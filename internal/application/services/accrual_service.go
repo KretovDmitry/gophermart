@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/cookiejar"
-	"sync"
 	"time"
 
 	"github.com/KretovDmitry/gophermart/internal/application/errs"
@@ -15,27 +15,34 @@ import (
 	"github.com/KretovDmitry/gophermart/internal/domain/entities"
 	"github.com/KretovDmitry/gophermart/internal/domain/repositories"
 	"github.com/KretovDmitry/gophermart/internal/interface/api/rest/response/accrual"
+	"github.com/KretovDmitry/gophermart/pkg/limiter"
 	"github.com/KretovDmitry/gophermart/pkg/logger"
+	"github.com/avito-tech/go-transaction-manager/trm/v2/manager"
+	"github.com/shopspring/decimal"
 )
 
 type AccrualService struct {
 	orderRepo   repositories.OrderRepository
 	accountRepo repositories.AccountRepository
+	trm         *manager.Manager
 	logger      logger.Logger
 	config      *config.Config
 	client      *http.Client
-	wg          *sync.WaitGroup
-	done        chan struct{}
+	limiter     *limiter.DynamicRateLimiter
 }
 
 func NewAccrualService(
 	orderRepo repositories.OrderRepository,
 	accountRepo repositories.AccountRepository,
+	trm *manager.Manager,
 	config *config.Config,
 	logger logger.Logger,
 ) (*AccrualService, error) {
 	if config == nil {
 		return nil, errors.New("nil dependency: config")
+	}
+	if trm == nil {
+		return nil, errors.New("nil dependency: transaction manager")
 	}
 
 	jar, err := cookiejar.New(nil)
@@ -48,137 +55,121 @@ func NewAccrualService(
 		Timeout: config.Accrual.Timeout,
 	}
 
+	limiter := limiter.NewDynamicRateLimiter(config.Accrual.Every, config.Accrual.Burst)
+
 	return &AccrualService{
 		orderRepo:   orderRepo,
 		accountRepo: accountRepo,
+		trm:         trm,
 		logger:      logger,
 		config:      config,
 		client:      client,
-		wg:          &sync.WaitGroup{},
-		done:        make(chan struct{}),
+		limiter:     limiter,
 	}, nil
 }
 
-func (s *AccrualService) Run() {
-	s.wg.Add(1)
-	go func() {
-		defer s.wg.Done()
-		s.run()
-	}()
-}
-
-func (s *AccrualService) Stop() {
-	sync.OnceFunc(func() {
-		close(s.done)
-	})()
-
-	ready := make(chan struct{})
-	go func() {
-		defer close(ready)
-		s.wg.Wait()
-	}()
-
-	select {
-	case <-time.After(s.config.HTTPServer.ShutdownTimeout):
-		s.logger.Error("accrual service stop: shutdown timeout exceeded")
-	case <-ready:
-		return
-	}
-}
-
-func (s *AccrualService) run() {
+func (s *AccrualService) Run(ctx context.Context) {
+	ticker := time.NewTicker(10 * time.Second)
 	offset := 0
 
 	for {
 		select {
-		case <-s.done:
+		case <-ctx.Done():
 			return
-		default:
-			nums, err := s.orderRepo.GetUnprocessedOrderNumbers(
-				context.TODO(),
-				s.config.Accrual.Limit,
-				offset)
+		case <-ticker.C:
+			s.logger.Debugf("offset: %d", offset)
+
+			orders, err := s.orderRepo.GetUnprocessedOrders(ctx, s.config.Accrual.Limit, offset)
 			if err != nil {
-				s.logger.Error(err)
-				time.Sleep(1 * time.Minute)
+				s.logger.Errorf("get unprocessed orders: %v", err)
+				time.Sleep(s.config.Accrual.Every)
 				continue
 			}
-			if err := s.fun(nums...); err != nil {
-				if errors.Is(err, errs.ErrRateLimit) {
-					time.Sleep(1 * time.Minute)
-					continue
+
+			maxOrderID := 0
+
+			for _, ord := range orders {
+				ord := ord
+				maxOrderID = max(maxOrderID, ord.ID)
+
+				if err = s.limiter.Wait(ctx); err != nil {
+					s.logger.Errorf("wait limiter: %v", err)
 				}
-				// TODO: ErrNotFound reset offset
+
+				if err = s.update(ctx, ord.Number); err != nil {
+					if errors.Is(err, io.EOF) {
+						s.logger.Debugf("no data for order: %q", ord.Number)
+						continue
+					}
+
+					s.logger.Error(err)
+
+					if errors.Is(err, errs.ErrRateLimit) {
+						time.Sleep(time.Minute)
+						s.limiter.Update(s.config.Accrual.Every+time.Second, s.config.Accrual.Burst)
+						continue
+					}
+
+					if errors.Is(err, errs.ErrNotFound) {
+						if offset == 0 {
+							time.Sleep(s.config.Accrual.Every)
+							continue
+						}
+						offset = 0
+						continue
+					}
+				}
 			}
-			offset += s.config.Accrual.Limit
+
+			if offset == maxOrderID {
+				offset = 0
+				continue
+			}
+
+			offset = maxOrderID
 		}
 	}
 }
 
-func (s *AccrualService) fun(nums ...entities.OrderNumber) error {
-	var wg sync.WaitGroup
+func (s *AccrualService) update(ctx context.Context, num entities.OrderNumber) error {
+	info, err := s.get(ctx, num)
+	if err != nil {
+		return fmt.Errorf("get order info: %w", err)
+	}
 
-	res := make(chan entities.UpdateOrderInfo, s.config.Accrual.Limit)
-
-	wg.Add(1)
-	go func() {
-		semaphore := make(chan struct{}, 5)
-
-		// have a max rate of 10/sec
-		rate := make(chan struct{}, 10)
-		for i := 0; i < cap(rate); i++ {
-			rate <- struct{}{}
+	return s.trm.Do(ctx, func(ctx context.Context) error {
+		userID, err := s.orderRepo.UpdateOrder(ctx, info)
+		if err != nil {
+			return fmt.Errorf("update order: %w", err)
 		}
 
-		// leaky bucket
-		go func() {
-			ticker := time.NewTicker(100 * time.Millisecond)
-			defer ticker.Stop()
-			for range ticker.C {
-				_, ok := <-rate
-				if !ok {
-					return
-				}
+		if info.Accrual.GreaterThan(decimal.NewFromInt(0)) {
+			if err = s.accountRepo.AddToAccount(ctx, userID, info.Accrual); err != nil {
+				return fmt.Errorf("add to account: %w", err)
 			}
-		}()
-
-		var wg sync.WaitGroup
-		for _, num := range nums {
-			num := num
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-
-				// wait for the rate limiter
-				rate <- struct{}{}
-
-				// check the concurrency semaphore
-				semaphore <- struct{}{}
-				defer func() {
-					<-semaphore
-				}()
-
-				go s.get(num, res)
-			}()
 		}
-		wg.Wait()
-		close(rate)
-	}()
-	wg.Wait()
 
-	return nil
+		return nil
+	})
 }
 
-func (s *AccrualService) get(num entities.OrderNumber, out chan entities.UpdateOrderInfo) error {
-	url := fmt.Sprintf("%s/api/orders/%s", s.config.Accrual.Address, num)
+func (s *AccrualService) get(ctx context.Context, num entities.OrderNumber) (*entities.UpdateOrderInfo, error) {
+	url := fmt.Sprintf("http://%s/api/orders/%s", s.config.Accrual.Address, num)
 
-	res, err := s.client.Get(url)
+	s.logger.Debugf("doing request for: %s", url)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("new request: %w", err)
+	}
+
+	res, err := s.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("do request: %w", err)
 	}
 
 	if res.StatusCode == http.StatusTooManyRequests {
-		return errs.ErrRateLimit
+		return nil, errs.ErrRateLimit
 	}
 
 	payload := new(accrual.UpdateOrderInfo)
@@ -186,10 +177,8 @@ func (s *AccrualService) get(num entities.OrderNumber, out chan entities.UpdateO
 	defer res.Body.Close()
 
 	if err = json.NewDecoder(res.Body).Decode(payload); err != nil {
-		return err
+		return nil, fmt.Errorf("decode response: %w", err)
 	}
 
-	out <- *entities.NewUpdateInfoFromResponse(payload)
-
-	return nil
+	return entities.NewUpdateInfoFromResponse(payload), nil
 }

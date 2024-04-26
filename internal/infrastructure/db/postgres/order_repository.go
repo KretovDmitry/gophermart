@@ -114,10 +114,8 @@ func (r *OrderRepository) GetOrdersByUserID(ctx context.Context, id user.ID) ([]
 	return orders, nil
 }
 
-func (r *OrderRepository) GetUnprocessedOrderNumbers(
-	ctx context.Context, limit, offset int,
-) ([]entities.OrderNumber, error) {
-	const query = "SELECT number FROM orders ORDER BY id LIMIT $1 OFFSET $2;"
+func (r *OrderRepository) GetUnprocessedOrders(ctx context.Context, limit, offset int) ([]*entities.Order, error) {
+	const query = "SELECT * FROM orders WHERE status > 'PROCESSED' ORDER BY id LIMIT $1 OFFSET $2;"
 
 	rows, err := r.db.QueryContext(ctx, query, limit, offset)
 	if err != nil {
@@ -127,16 +125,23 @@ func (r *OrderRepository) GetUnprocessedOrderNumbers(
 		return nil, err
 	}
 
-	numbers := make([]entities.OrderNumber, 0, limit)
+	orders := make([]*entities.Order, 0, limit)
 
 	for rows.Next() {
-		var number entities.OrderNumber
-
-		if err = rows.Scan(&number); err != nil {
+		order := new(entities.Order)
+		err = rows.Scan(
+			&order.ID,
+			&order.UserID,
+			&order.Number,
+			&order.Status,
+			&order.Accrual,
+			&order.UploadetAt,
+		)
+		if err != nil {
 			return nil, err
 		}
 
-		numbers = append(numbers, number)
+		orders = append(orders, order)
 	}
 
 	defer func() {
@@ -150,5 +155,20 @@ func (r *OrderRepository) GetUnprocessedOrderNumbers(
 		return nil, err
 	}
 
-	return numbers, nil
+	return orders, nil
+}
+
+func (r *OrderRepository) UpdateOrder(ctx context.Context, info *entities.UpdateOrderInfo) (user.ID, error) {
+	const query = "UPDATE orders SET status = $1, accrual = $2, WHERE number = $3 RETURNING user_id;"
+
+	var userID user.ID = -1
+
+	err := r.getter.DefaultTrOrDB(ctx, r.db).
+		QueryRowContext(ctx, query, info.Status, info.Accrual, info.Number).
+		Scan(&userID)
+	if err != nil {
+		return userID, err
+	}
+
+	return userID, nil
 }

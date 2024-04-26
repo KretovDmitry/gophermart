@@ -147,6 +147,13 @@ func run() error {
 		serverStopCtx()
 	}()
 
+	accrualService, err := services.NewAccrualService(orderRepo, accountRepo, trManager, cfg, logger)
+	if err != nil {
+		return fmt.Errorf("failed to init accrual service: %w", err)
+	}
+
+	go accrualService.Run(serverCtx)
+
 	// Start the HTTP server with graceful shutdown.
 	logger.Infof("Server %v is running at %v", Version, cfg.HTTPServer.Address)
 	if err = hs.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {

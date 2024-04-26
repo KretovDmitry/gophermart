@@ -138,9 +138,20 @@ func (r *AccountRepository) GetWithdrawalsByUserID(ctx context.Context, id user.
 }
 
 func (r *AccountRepository) CreateAccount(ctx context.Context, id user.ID) error {
-	const query = "INSERT INTO accounts (user_id) VALUES ($1)"
+	const query = "INSERT INTO accounts (user_id) VALUES ($1);"
 
 	_, err := r.getter.DefaultTrOrDB(ctx, r.db).ExecContext(ctx, query, id)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *AccountRepository) AddToAccount(ctx context.Context, id user.ID, sum decimal.Decimal) error {
+	const query = "UPDATE accounts SET balance = balance + $1 WHERE user_id = $2;"
+
+	_, err := r.getter.DefaultTrOrDB(ctx, r.db).ExecContext(ctx, query, sum, id)
 	if err != nil {
 		return err
 	}

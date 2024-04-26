@@ -34,6 +34,10 @@ type (
 		Timeout time.Duration `yaml:"timeout" env-default:"10s"`
 		// DB read limit.
 		Limit int `yaml:"limit"`
+		// Time interval between burst acrrual API calls.
+		Every time.Duration `yaml:"every" env-default:"10s"`
+		// Number of simultaneous calls to the accrual service.
+		Burst int `yaml:"burst" env-default:"10"`
 	}
 	// Config for HTTP server.
 	HTTPServer struct {

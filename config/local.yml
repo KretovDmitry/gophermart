@@ -3,6 +3,8 @@ accrual:
   address: "127.0.0.1:8080"
   timeout: "10s"
   limit: 100
+  every: "10s"
+  burst: 10
 http_server:
   run_address: "127.0.0.1:8081"
   timeout: "5s"
