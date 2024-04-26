@@ -159,7 +159,7 @@ func (r *OrderRepository) GetUnprocessedOrders(ctx context.Context, limit, offse
 }
 
 func (r *OrderRepository) UpdateOrder(ctx context.Context, info *entities.UpdateOrderInfo) (user.ID, error) {
-	const query = "UPDATE orders SET status = $1, accrual = $2, WHERE number = $3 RETURNING user_id;"
+	const query = "UPDATE orders SET status = $1, accrual = $2 WHERE number = $3 RETURNING user_id;"
 
 	var userID user.ID = -1
 
