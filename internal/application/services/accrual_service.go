@@ -107,7 +107,10 @@ func (s *AccrualService) run(ctx context.Context) {
 		select {
 		case <-s.done:
 			return
-		case order := <-ordersChan:
+		case order, open := <-ordersChan:
+			if !open {
+				return
+			}
 			if err := s.limiter.Wait(ctx); err != nil {
 				if !errors.Is(err, context.Canceled) {
 					s.logger.Errorf("wait limiter: %v", err)
