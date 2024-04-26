@@ -13,6 +13,7 @@ import (
 	"github.com/KretovDmitry/gophermart/internal/application/errs"
 	"github.com/KretovDmitry/gophermart/internal/config"
 	"github.com/KretovDmitry/gophermart/internal/domain/entities"
+	"github.com/KretovDmitry/gophermart/internal/domain/entities/user"
 	"github.com/KretovDmitry/gophermart/internal/domain/repositories"
 	"github.com/KretovDmitry/gophermart/internal/interface/api/rest/response/accrual"
 	"github.com/KretovDmitry/gophermart/pkg/limiter"
@@ -100,64 +101,79 @@ func (s *AccrualService) Stop() {
 }
 
 func (s *AccrualService) run(ctx context.Context) {
-	ticker := time.NewTicker(5 * time.Second)
-	offset := 0
+	ordersChan := s.provideOrdersFromDB(ctx)
 
 	for {
 		select {
 		case <-s.done:
 			return
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			s.logger.Debugf("offset: %d", offset)
-
-			orders, err := s.orderRepo.GetUnprocessedOrders(ctx, s.config.Accrual.Limit, offset)
-			if err != nil {
-				if errors.Is(err, errs.ErrNotFound) {
-					offset = 0
-					continue
+		case order := <-ordersChan:
+			if err := s.limiter.Wait(ctx); err != nil {
+				if !errors.Is(err, context.Canceled) {
+					s.logger.Errorf("wait limiter: %v", err)
 				}
-				s.logger.Errorf("get unprocessed orders: %v", err)
-				continue
 			}
 
-			offset += len(orders)
-
-			for _, ord := range orders {
-				ord := ord
-
-				if err = s.limiter.Wait(ctx); err != nil {
-					if !errors.Is(err, context.Canceled) {
-						s.logger.Errorf("wait limiter: %v", err)
-					}
-				}
-
-				if err = s.update(ctx, ord.Number); err != nil {
-					if errors.Is(err, errs.ErrRateLimit) {
-						time.Sleep(time.Minute)
-						s.limiter.Update(s.config.Accrual.Every+time.Second, s.config.Accrual.Burst)
-						continue
-					}
+			if err := s.update(ctx, order.Number); err != nil {
+				if errors.Is(err, errs.ErrRateLimit) {
+					time.Sleep(time.Minute)
+					s.limiter.Update(s.config.Accrual.Every+time.Second, s.config.Accrual.Burst)
+					continue
 				}
 			}
 		}
 	}
 }
 
+func (s *AccrualService) provideOrdersFromDB(ctx context.Context) chan *entities.Order {
+	ticker := time.NewTicker(s.config.Accrual.Every)
+	out := make(chan *entities.Order)
+	offset := 0
+
+	go func() {
+		defer close(out)
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				orders, err := s.orderRepo.GetUnprocessedOrders(ctx, s.config.Accrual.Limit, offset)
+				if err != nil {
+					if errors.Is(err, errs.ErrNotFound) {
+						offset = 0
+						continue
+					}
+					s.logger.Errorf("get unprocessed orders: %v", err)
+					continue
+				}
+
+				offset += len(orders)
+
+				for _, order := range orders {
+					out <- order
+				}
+			}
+		}
+	}()
+
+	return out
+}
+
 func (s *AccrualService) update(ctx context.Context, num entities.OrderNumber) error {
 	info, err := s.get(ctx, num)
 	if err != nil {
+		// [http.StatusNoContent]
 		if errors.Is(err, errs.ErrNotFound) {
 			return nil
 		}
 		return fmt.Errorf("get order info: %w", err)
 	}
 
-	s.logger.Debugf("got order info: %v", info)
-
 	return s.trm.Do(ctx, func(ctx context.Context) error {
-		userID, err := s.orderRepo.UpdateOrder(ctx, info)
+		var userID user.ID
+
+		userID, err = s.orderRepo.UpdateOrder(ctx, info)
 		if err != nil {
 			return fmt.Errorf("update order: %w", err)
 		}
@@ -175,8 +191,6 @@ func (s *AccrualService) update(ctx context.Context, num entities.OrderNumber) e
 func (s *AccrualService) get(ctx context.Context, num entities.OrderNumber) (*entities.UpdateOrderInfo, error) {
 	url := fmt.Sprintf("%s/api/orders/%s", s.config.Accrual.Address, num)
 
-	s.logger.Debugf("doing request for: %s", url)
-
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("new request: %w", err)
@@ -191,7 +205,6 @@ func (s *AccrualService) get(ctx context.Context, num entities.OrderNumber) (*en
 	case http.StatusTooManyRequests:
 		return nil, errs.ErrRateLimit
 	case http.StatusNoContent:
-		s.logger.Debugf("no data for order: %q", num)
 		return nil, errs.ErrNotFound
 	}
 
