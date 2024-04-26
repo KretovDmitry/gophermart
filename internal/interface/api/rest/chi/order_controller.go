@@ -108,6 +108,8 @@ func (c *OrderController) GetOrders(w http.ResponseWriter, r *http.Request) {
 		res[i] = response.NewGetOrdersFromOrderEntity(order)
 	}
 
+	w.Header().Set("Content-Type", "application/json")
+
 	// Encode and return them. Status 200.
 	if err = json.NewEncoder(w).Encode(res); err != nil {
 		c.ErrorHandlerFunc(w, r, err)

@@ -63,6 +63,8 @@ func (c *AccountController) GetBalance(w http.ResponseWriter, r *http.Request) {
 	// Create response payload.
 	response := response.NewGetBalance(account)
 
+	w.Header().Set("Content-Type", "application/json")
+
 	// Encode and return. Status 200.
 	if err = json.NewEncoder(w).Encode(response); err != nil {
 		c.ErrorHandlerFunc(w, r, err)
@@ -139,6 +141,8 @@ func (c *AccountController) GetWithdrawals(w http.ResponseWriter, r *http.Reques
 	for i, w := range withdrawals {
 		res[i] = response.NewGetWithdrawals(w)
 	}
+
+	w.Header().Set("Content-Type", "application/json")
 
 	// Encode them. Status 200 OK.
 	if err = json.NewEncoder(w).Encode(res); err != nil {
