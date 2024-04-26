@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/cookiejar"
+	"sync"
 	"time"
 
 	"github.com/KretovDmitry/gophermart/internal/application/errs"
@@ -29,6 +29,8 @@ type AccrualService struct {
 	config      *config.Config
 	client      *http.Client
 	limiter     *limiter.DynamicRateLimiter
+	wg          *sync.WaitGroup
+	done        chan struct{}
 }
 
 func NewAccrualService(
@@ -65,15 +67,46 @@ func NewAccrualService(
 		config:      config,
 		client:      client,
 		limiter:     limiter,
+		wg:          &sync.WaitGroup{},
+		done:        make(chan struct{}),
 	}, nil
 }
 
 func (s *AccrualService) Run(ctx context.Context) {
-	ticker := time.NewTicker(10 * time.Second)
+	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
+		s.run(ctx)
+	}()
+}
+
+func (s *AccrualService) Stop() {
+	sync.OnceFunc(func() {
+		close(s.done)
+	})()
+
+	ready := make(chan struct{})
+	go func() {
+		defer close(ready)
+		s.wg.Wait()
+	}()
+
+	select {
+	case <-time.After(s.config.HTTPServer.ShutdownTimeout):
+		s.logger.Error("accrual service stop: shutdown timeout exceeded")
+	case <-ready:
+		return
+	}
+}
+
+func (s *AccrualService) run(ctx context.Context) {
+	ticker := time.NewTicker(5 * time.Second)
 	offset := 0
 
 	for {
 		select {
+		case <-s.done:
+			return
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
@@ -81,52 +114,33 @@ func (s *AccrualService) Run(ctx context.Context) {
 
 			orders, err := s.orderRepo.GetUnprocessedOrders(ctx, s.config.Accrual.Limit, offset)
 			if err != nil {
+				if errors.Is(err, errs.ErrNotFound) {
+					offset = 0
+					continue
+				}
 				s.logger.Errorf("get unprocessed orders: %v", err)
-				time.Sleep(s.config.Accrual.Every)
 				continue
 			}
 
-			maxOrderID := 0
+			offset += len(orders)
 
 			for _, ord := range orders {
 				ord := ord
-				maxOrderID = max(maxOrderID, ord.ID)
 
 				if err = s.limiter.Wait(ctx); err != nil {
-					s.logger.Errorf("wait limiter: %v", err)
+					if !errors.Is(err, context.Canceled) {
+						s.logger.Errorf("wait limiter: %v", err)
+					}
 				}
 
 				if err = s.update(ctx, ord.Number); err != nil {
-					if errors.Is(err, io.EOF) {
-						s.logger.Debugf("no data for order: %q", ord.Number)
-						continue
-					}
-
-					s.logger.Error(err)
-
 					if errors.Is(err, errs.ErrRateLimit) {
 						time.Sleep(time.Minute)
 						s.limiter.Update(s.config.Accrual.Every+time.Second, s.config.Accrual.Burst)
 						continue
 					}
-
-					if errors.Is(err, errs.ErrNotFound) {
-						if offset == 0 {
-							time.Sleep(s.config.Accrual.Every)
-							continue
-						}
-						offset = 0
-						continue
-					}
 				}
 			}
-
-			if offset == maxOrderID {
-				offset = 0
-				continue
-			}
-
-			offset = maxOrderID
 		}
 	}
 }
@@ -134,8 +148,13 @@ func (s *AccrualService) Run(ctx context.Context) {
 func (s *AccrualService) update(ctx context.Context, num entities.OrderNumber) error {
 	info, err := s.get(ctx, num)
 	if err != nil {
+		if errors.Is(err, errs.ErrNotFound) {
+			return nil
+		}
 		return fmt.Errorf("get order info: %w", err)
 	}
+
+	s.logger.Debugf("got order info: %v", info)
 
 	return s.trm.Do(ctx, func(ctx context.Context) error {
 		userID, err := s.orderRepo.UpdateOrder(ctx, info)
@@ -168,8 +187,12 @@ func (s *AccrualService) get(ctx context.Context, num entities.OrderNumber) (*en
 		return nil, fmt.Errorf("do request: %w", err)
 	}
 
-	if res.StatusCode == http.StatusTooManyRequests {
+	switch res.StatusCode {
+	case http.StatusTooManyRequests:
 		return nil, errs.ErrRateLimit
+	case http.StatusNoContent:
+		s.logger.Debugf("no data for order: %q", num)
+		return nil, errs.ErrNotFound
 	}
 
 	payload := new(accrual.UpdateOrderInfo)

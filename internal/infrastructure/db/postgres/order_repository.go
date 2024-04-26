@@ -75,9 +75,6 @@ func (r *OrderRepository) GetOrdersByUserID(ctx context.Context, id user.ID) ([]
 
 	rows, err := r.db.QueryContext(ctx, query, id)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, errs.ErrNotFound
-		}
 		return nil, err
 	}
 
@@ -111,6 +108,10 @@ func (r *OrderRepository) GetOrdersByUserID(ctx context.Context, id user.ID) ([]
 		return nil, err
 	}
 
+	if len(orders) == 0 {
+		return nil, errs.ErrNotFound
+	}
+
 	return orders, nil
 }
 
@@ -119,9 +120,6 @@ func (r *OrderRepository) GetUnprocessedOrders(ctx context.Context, limit, offse
 
 	rows, err := r.db.QueryContext(ctx, query, limit, offset)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, errs.ErrNotFound
-		}
 		return nil, err
 	}
 
@@ -153,6 +151,10 @@ func (r *OrderRepository) GetUnprocessedOrders(ctx context.Context, limit, offse
 	// Rows.Err will report the last error encountered by Rows.Scan.
 	if err = rows.Err(); err != nil {
 		return nil, err
+	}
+
+	if len(orders) == 0 {
+		return nil, errs.ErrNotFound
 	}
 
 	return orders, nil

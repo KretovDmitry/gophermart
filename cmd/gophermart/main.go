@@ -153,6 +153,7 @@ func run() error {
 	}
 
 	go accrualService.Run(serverCtx)
+	defer accrualService.Stop()
 
 	// Start the HTTP server with graceful shutdown.
 	logger.Infof("Server %v is running at %v", Version, cfg.HTTPServer.Address)

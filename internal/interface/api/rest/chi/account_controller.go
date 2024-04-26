@@ -113,11 +113,14 @@ func (c *AccountController) Withdraw(w http.ResponseWriter, r *http.Request) {
 	// Create params for Withdraw interface method.
 	params := params.NewWithraw(u.ID, orderNumber, payload.Sum)
 
-	// Return 200 OK if there is no error.
+	// Withdraw funds.
 	if err = c.service.Withdraw(r.Context(), params); err != nil {
 		c.ErrorHandlerFunc(w, r, err)
 		return
 	}
+
+	// Return 200 OK if there is no error.
+	w.WriteHeader(http.StatusOK)
 }
 
 // Get all user withdrawals (GET /api/user/withdrawals HTTP/1.1).
@@ -158,10 +161,6 @@ func (c *AccountController) ErrorHandlerFunc(w http.ResponseWriter, _ *http.Requ
 	code := http.StatusInternalServerError
 
 	switch {
-	// Status OK (200).
-	case errors.Is(err, errs.ErrAlreadyExists):
-		code = http.StatusOK
-
 	// Status No Content (204).
 	case errors.Is(err, errs.ErrNotFound):
 		code = http.StatusNoContent
@@ -175,7 +174,8 @@ func (c *AccountController) ErrorHandlerFunc(w http.ResponseWriter, _ *http.Requ
 		code = http.StatusPaymentRequired
 
 	// Status Conflict (409).
-	case errors.Is(err, errs.ErrDataConflict):
+	case errors.Is(err, errs.ErrDataConflict) ||
+		errors.Is(err, errs.ErrAlreadyExists):
 		code = http.StatusConflict
 
 	// Status Unproccessable Entity (422).
