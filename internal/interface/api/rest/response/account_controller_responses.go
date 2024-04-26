@@ -7,27 +7,27 @@ import (
 )
 
 type GetBalance struct {
-	Balance   string `json:"current"`
-	Withdrawn string `json:"withdrawn"`
+	Balance   float64 `json:"current"`
+	Withdrawn float64 `json:"withdrawn"`
 }
 
 func NewGetBalance(e *entities.Account) GetBalance {
 	return GetBalance{
-		Balance:   e.Balance.StringFixed(2),
-		Withdrawn: e.Withdrawn.StringFixed(2),
+		Balance:   e.Balance.InexactFloat64(),
+		Withdrawn: e.Withdrawn.InexactFloat64(),
 	}
 }
 
 type GetWithdrawals struct {
 	ProcessedAt time.Time            `json:"processed_at"`
 	Order       entities.OrderNumber `json:"order"`
-	Sum         string               `json:"sum"`
+	Sum         float64              `json:"sum"`
 }
 
 func NewGetWithdrawals(e *entities.Withdrawal) *GetWithdrawals {
 	return &GetWithdrawals{
 		Order:       e.Order,
-		Sum:         e.Sum.StringFixed(2),
+		Sum:         e.Sum.InexactFloat64(),
 		ProcessedAt: e.ProcessedAt,
 	}
 }

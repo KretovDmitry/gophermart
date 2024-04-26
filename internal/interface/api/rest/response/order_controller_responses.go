@@ -9,7 +9,7 @@ import (
 type GetOrders struct {
 	Number     entities.OrderNumber `json:"number"`
 	Status     entities.OrderStatus `json:"status"`
-	Accrual    string               `json:"accrual"`
+	Accrual    float64              `json:"accrual,omitempty"`
 	UploadetAt time.Time            `json:"uploadet_at"`
 }
 
@@ -17,7 +17,7 @@ func NewGetOrdersFromOrderEntity(e *entities.Order) *GetOrders {
 	return &GetOrders{
 		Number:     e.Number,
 		Status:     e.Status,
-		Accrual:    e.Accrual.StringFixed(2),
+		Accrual:    e.Accrual.InexactFloat64(),
 		UploadetAt: e.UploadetAt,
 	}
 }
