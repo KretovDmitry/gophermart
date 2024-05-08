@@ -81,7 +81,7 @@ func run() error {
 	}
 	orderRepo, err := postgres.NewOrderRepository(db, trmsql.DefaultCtxGetter, logger)
 	if err != nil {
-		return fmt.Errorf("failed to order account repository: %w", err)
+		return fmt.Errorf("failed to init order repository: %w", err)
 	}
 
 	// Init services.
@@ -102,20 +102,21 @@ func run() error {
 	router := rest.InitChi(logger)
 
 	// Init and group handlers for auth routes.
-	rest.NewAuthController(authService, cfg.JWT.Expiration, rest.ChiServerOptions{
-		BaseURL:    "/api/user",
-		BaseRouter: router,
-	})
+	rest.NewAuthController(
+		authService, cfg.JWT.Expiration, logger, rest.ChiServerOptions{
+			BaseURL:    "/api/user",
+			BaseRouter: router,
+		})
 
 	// Init and group handlers for order routes.
-	rest.NewOrderController(orderService, rest.ChiServerOptions{
+	rest.NewOrderController(orderService, logger, rest.ChiServerOptions{
 		BaseURL:     "/api/user",
 		BaseRouter:  router,
 		Middlewares: []rest.MiddlewareFunc{middleware.Middleware(authService)},
 	})
 
 	// Init and group handlers for account routes.
-	rest.NewAccountController(accountService, rest.ChiServerOptions{
+	rest.NewAccountController(accountService, logger, rest.ChiServerOptions{
 		BaseURL:     "/api/user",
 		BaseRouter:  router,
 		Middlewares: []rest.MiddlewareFunc{middleware.Middleware(authService)},

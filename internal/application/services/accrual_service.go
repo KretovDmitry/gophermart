@@ -200,21 +200,20 @@ func (s *AccrualService) get(ctx context.Context, num entities.OrderNumber) (*en
 	if err != nil {
 		return nil, fmt.Errorf("do request: %w", err)
 	}
+	defer res.Body.Close()
 
 	switch res.StatusCode {
 	case http.StatusTooManyRequests:
 		return nil, errs.ErrRateLimit
 	case http.StatusNoContent:
 		return nil, errs.ErrNotFound
+	default:
+		payload := new(accrual.UpdateOrderInfo)
+
+		if err = json.NewDecoder(res.Body).Decode(payload); err != nil {
+			return nil, fmt.Errorf("decode response: %w", err)
+		}
+
+		return entities.NewUpdateInfoFromResponse(payload), nil
 	}
-
-	payload := new(accrual.UpdateOrderInfo)
-
-	defer res.Body.Close()
-
-	if err = json.NewDecoder(res.Body).Decode(payload); err != nil {
-		return nil, fmt.Errorf("decode response: %w", err)
-	}
-
-	return entities.NewUpdateInfoFromResponse(payload), nil
 }

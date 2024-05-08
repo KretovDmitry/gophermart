@@ -11,11 +11,13 @@ import (
 	"github.com/KretovDmitry/gophermart/internal/application/interfaces"
 	"github.com/KretovDmitry/gophermart/internal/interface/api/rest/header"
 	"github.com/KretovDmitry/gophermart/internal/interface/api/rest/request"
+	"github.com/KretovDmitry/gophermart/pkg/logger"
 	"github.com/go-chi/chi/v5"
 )
 
 type AuthController struct {
 	service         interfaces.AuthService
+	logger          logger.Logger
 	tokenExpiration time.Duration
 }
 
@@ -23,6 +25,7 @@ type AuthController struct {
 func NewAuthController(
 	service interfaces.AuthService,
 	tokenExpiration time.Duration,
+	logger logger.Logger,
 	options ChiServerOptions,
 ) {
 	r := options.BaseRouter
@@ -34,6 +37,7 @@ func NewAuthController(
 	c := AuthController{
 		service:         service,
 		tokenExpiration: tokenExpiration,
+		logger:          logger,
 	}
 
 	r.Group(func(r chi.Router) {
@@ -183,6 +187,8 @@ func (c *AuthController) ErrorHandlerFunc(w http.ResponseWriter, _ *http.Request
 	}
 
 	w.WriteHeader(code)
+
+	c.logger.Errorf("auth controller [%d]: %s", code, err)
 
 	if err = json.NewEncoder(w).Encode(errJSON); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

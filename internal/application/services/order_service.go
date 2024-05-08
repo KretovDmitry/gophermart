@@ -23,19 +23,10 @@ var _ interfaces.OrderService = (*OrderService)(nil)
 
 // Create new order for user.
 func (s *OrderService) CreateOrder(ctx context.Context, id user.ID, num entities.OrderNumber) error {
-	if err := s.repo.CreateOrder(ctx, id, num); err != nil {
-		return err
-	}
-
-	return nil
+	return s.repo.CreateOrder(ctx, id, num)
 }
 
 // Get user's orders.
 func (s *OrderService) GetOrders(ctx context.Context, id user.ID) ([]*entities.Order, error) {
-	orders, err := s.repo.GetOrdersByUserID(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-
-	return orders, nil
+	return s.repo.GetOrdersByUserID(ctx, id)
 }

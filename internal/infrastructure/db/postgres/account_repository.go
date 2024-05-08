@@ -20,7 +20,9 @@ type AccountRepository struct {
 	logger logger.Logger
 }
 
-func NewAccountRepository(db *sql.DB, getter *trmsql.CtxGetter, logger logger.Logger) (*AccountRepository, error) {
+func NewAccountRepository(
+	db *sql.DB, getter *trmsql.CtxGetter, logger logger.Logger,
+) (*AccountRepository, error) {
 	if db == nil {
 		return nil, errors.New("nil dependency: database")
 	}
@@ -33,8 +35,17 @@ func NewAccountRepository(db *sql.DB, getter *trmsql.CtxGetter, logger logger.Lo
 
 var _ repositories.AccountRepository = (*AccountRepository)(nil)
 
-func (r *AccountRepository) GetAccountByUserID(ctx context.Context, id user.ID) (*entities.Account, error) {
-	const query = "SELECT * FROM accounts WHERE user_id = $1"
+func (r *AccountRepository) GetAccountByUserID(
+	ctx context.Context, id user.ID,
+) (*entities.Account, error) {
+	const query = `
+		SELECT
+			id, user_id, balance, withdrawn
+		FROM
+			accounts
+		WHERE
+			user_id = $1
+	`
 
 	account := new(entities.Account)
 
@@ -51,18 +62,27 @@ func (r *AccountRepository) GetAccountByUserID(ctx context.Context, id user.ID) 
 	return account, nil
 }
 
-func (r *AccountRepository) Withdraw(ctx context.Context, userID user.ID, sum decimal.Decimal) error {
+func (r *AccountRepository) Withdraw(
+	ctx context.Context, userID user.ID, sum decimal.Decimal,
+) error {
 	const query = `
-		UPDATE accounts SET 
+		UPDATE
+			accounts
+		SET
 			balance = balance - $1,
 			withdrawn = withdrawn + $1
-		WHERE user_id = $2 
-			RETURNING balance;
+		WHERE
+			user_id = $2
+		RETURNING
+			balance;
 	`
 
 	var updatedBalance decimal.Decimal
 
-	err := r.getter.DefaultTrOrDB(ctx, r.db).QueryRowContext(ctx, query, sum, userID).Scan(&updatedBalance)
+	err := r.getter.
+		DefaultTrOrDB(ctx, r.db).
+		QueryRowContext(ctx, query, sum, userID).
+		Scan(&updatedBalance)
 	if err != nil {
 		return err
 	}
@@ -74,13 +94,18 @@ func (r *AccountRepository) Withdraw(ctx context.Context, userID user.ID, sum de
 	return nil
 }
 
-func (r *AccountRepository) SaveAccountOperation(ctx context.Context, op *entities.Operation) error {
+func (r *AccountRepository) SaveAccountOperation(
+	ctx context.Context, op *entities.Operation,
+) error {
 	const query = `
-		INSERT INTO account_operations (account_id, operation, order_number, sum)
-		VALUES ((SELECT id FROM accounts WHERE user_id = $1), $2, $3, $4);
+		INSERT INTO account_operations
+			(account_id, operation, order_number, sum)
+		VALUES
+			((SELECT id FROM accounts WHERE user_id = $1), $2, $3, $4)
 	`
 
-	_, err := r.getter.DefaultTrOrDB(ctx, r.db).
+	_, err := r.getter.
+		DefaultTrOrDB(ctx, r.db).
 		ExecContext(ctx, query, op.UserID, op.Type, op.Order, op.Sum)
 	if err != nil {
 		return err
@@ -89,13 +114,19 @@ func (r *AccountRepository) SaveAccountOperation(ctx context.Context, op *entiti
 	return nil
 }
 
-func (r *AccountRepository) GetWithdrawalsByUserID(ctx context.Context, id user.ID) ([]*entities.Withdrawal, error) {
+func (r *AccountRepository) GetWithdrawalsByUserID(
+	ctx context.Context, id user.ID,
+) ([]*entities.Withdrawal, error) {
 	const query = `
-		SELECT order_number, sum, processed_at FROM account_operations
-		WHERE operation = 'WITHDRAWAL' AND account_id = (
-			SELECT id FROM accounts WHERE user_id = $1
-		)
-		ORDER BY processed_at DESC;
+		SELECT
+			order_number, sum, processed_at
+		FROM
+			account_operations
+		WHERE
+			operation = 'WITHDRAWAL'
+		AND
+			account_id = (SELECT id FROM accounts WHERE user_id = $1)
+		ORDER BY processed_at DESC
 	`
 
 	withdrawals := make([]*entities.Withdrawal, 0)
@@ -138,7 +169,12 @@ func (r *AccountRepository) GetWithdrawalsByUserID(ctx context.Context, id user.
 }
 
 func (r *AccountRepository) CreateAccount(ctx context.Context, id user.ID) error {
-	const query = "INSERT INTO accounts (user_id) VALUES ($1);"
+	const query = `
+		INSERT INTO accounts
+			(user_id)
+		VALUES
+			($1)
+	`
 
 	_, err := r.getter.DefaultTrOrDB(ctx, r.db).ExecContext(ctx, query, id)
 	if err != nil {
@@ -148,8 +184,17 @@ func (r *AccountRepository) CreateAccount(ctx context.Context, id user.ID) error
 	return nil
 }
 
-func (r *AccountRepository) AddToAccount(ctx context.Context, id user.ID, sum decimal.Decimal) error {
-	const query = "UPDATE accounts SET balance = balance + $1 WHERE user_id = $2;"
+func (r *AccountRepository) AddToAccount(
+	ctx context.Context, id user.ID, sum decimal.Decimal,
+) error {
+	const query = `
+		UPDATE
+			accounts
+		SET
+			balance = balance + $1
+		WHERE
+			user_id = $2
+	`
 
 	_, err := r.getter.DefaultTrOrDB(ctx, r.db).ExecContext(ctx, query, sum, id)
 	if err != nil {

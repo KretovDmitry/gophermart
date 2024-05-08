@@ -19,7 +19,9 @@ type OrderRepository struct {
 	logger logger.Logger
 }
 
-func NewOrderRepository(db *sql.DB, getter *trmsql.CtxGetter, logger logger.Logger) (*OrderRepository, error) {
+func NewOrderRepository(
+	db *sql.DB, getter *trmsql.CtxGetter, logger logger.Logger,
+) (*OrderRepository, error) {
 	if db == nil {
 		return nil, errors.New("nil dependency: database")
 	}
@@ -32,7 +34,9 @@ func NewOrderRepository(db *sql.DB, getter *trmsql.CtxGetter, logger logger.Logg
 
 var _ repositories.OrderRepository = (*OrderRepository)(nil)
 
-func (r *OrderRepository) CreateOrder(ctx context.Context, id user.ID, num entities.OrderNumber) error {
+func (r *OrderRepository) CreateOrder(
+	ctx context.Context, id user.ID, num entities.OrderNumber,
+) error {
 	const query = `
 		WITH input_rows(user_id, number) AS (
 			VALUES ($1::integer, $2::text)
@@ -70,8 +74,25 @@ func (r *OrderRepository) CreateOrder(ctx context.Context, id user.ID, num entit
 	return nil
 }
 
-func (r *OrderRepository) GetOrdersByUserID(ctx context.Context, id user.ID) ([]*entities.Order, error) {
-	const query = "SELECT * FROM orders WHERE user_id = $1 ORDER BY uploadet_at DESC"
+func (r *OrderRepository) GetOrdersByUserID(
+	ctx context.Context, id user.ID,
+) ([]*entities.Order, error) {
+	const query = `
+		SELECT
+			id,
+			user_id,
+			number,
+			status,
+			accrual,
+			uploadet_at
+		FROM
+			orders
+		WHERE
+			user_id = $1
+		ORDER BY
+			uploadet_at
+		DESC
+	`
 
 	rows, err := r.db.QueryContext(ctx, query, id)
 	if err != nil {
@@ -115,8 +136,28 @@ func (r *OrderRepository) GetOrdersByUserID(ctx context.Context, id user.ID) ([]
 	return orders, nil
 }
 
-func (r *OrderRepository) GetUnprocessedOrders(ctx context.Context, limit, offset int) ([]*entities.Order, error) {
-	const query = "SELECT * FROM orders WHERE status > 'PROCESSED' ORDER BY id LIMIT $1 OFFSET $2;"
+func (r *OrderRepository) GetUnprocessedOrders(
+	ctx context.Context, limit, offset int,
+) ([]*entities.Order, error) {
+	const query = `
+		SELECT
+			id,
+			user_id,
+			number,
+			status,
+			accrual,
+			uploadet_at
+		FROM
+			orders
+		WHERE
+			status > 'PROCESSED'
+		ORDER BY
+			id
+		LIMIT
+			$1
+		OFFSET
+			$2
+	`
 
 	rows, err := r.db.QueryContext(ctx, query, limit, offset)
 	if err != nil {
@@ -160,8 +201,20 @@ func (r *OrderRepository) GetUnprocessedOrders(ctx context.Context, limit, offse
 	return orders, nil
 }
 
-func (r *OrderRepository) UpdateOrder(ctx context.Context, info *entities.UpdateOrderInfo) (user.ID, error) {
-	const query = "UPDATE orders SET status = $1, accrual = $2 WHERE number = $3 RETURNING user_id;"
+func (r *OrderRepository) UpdateOrder(
+	ctx context.Context, info *entities.UpdateOrderInfo,
+) (user.ID, error) {
+	const query = `
+		UPDATE
+			orders
+		SET
+			status = $1,
+			accrual = $2
+		WHERE
+			number = $3
+		RETURNING
+			user_id
+	`
 
 	var userID user.ID = -1
 

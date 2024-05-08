@@ -13,15 +13,19 @@ import (
 	"github.com/KretovDmitry/gophermart/internal/domain/entities/user"
 	"github.com/KretovDmitry/gophermart/internal/interface/api/rest/header"
 	"github.com/KretovDmitry/gophermart/internal/interface/api/rest/response"
+	"github.com/KretovDmitry/gophermart/pkg/logger"
 	"github.com/go-chi/chi/v5"
 )
 
 type OrderController struct {
 	service interfaces.OrderService
+	logger  logger.Logger
 }
 
 // NewOrderController registers http.Handlers with additional options.
-func NewOrderController(service interfaces.OrderService, options ChiServerOptions) {
+func NewOrderController(
+	service interfaces.OrderService, logger logger.Logger, options ChiServerOptions,
+) {
 	r := options.BaseRouter
 
 	if r == nil {
@@ -30,6 +34,7 @@ func NewOrderController(service interfaces.OrderService, options ChiServerOption
 
 	c := OrderController{
 		service: service,
+		logger:  logger,
 	}
 
 	r.Group(func(r chi.Router) {
@@ -128,7 +133,7 @@ func (c *OrderController) ErrorHandlerFunc(w http.ResponseWriter, _ *http.Reques
 	// I used this error to distinguish between an attempt to create the same
 	// order by the same user in which case we should return 200 OK and
 	// actually the first time new order creation when status 202
-	// Accepted is returned (method return nil err in this case).
+	// Accepted is returned (method returns nil err in this case).
 	case errors.Is(err, errs.ErrAlreadyExists):
 		code = http.StatusOK
 
@@ -140,7 +145,7 @@ func (c *OrderController) ErrorHandlerFunc(w http.ResponseWriter, _ *http.Reques
 	case errors.Is(err, errs.ErrInvalidRequest):
 		code = http.StatusBadRequest
 
-	// Stats Payment Required (402).
+	// Status Payment Required (402).
 	case errors.Is(err, errs.ErrNotEnoughFunds):
 		code = http.StatusPaymentRequired
 
@@ -154,6 +159,8 @@ func (c *OrderController) ErrorHandlerFunc(w http.ResponseWriter, _ *http.Reques
 	}
 
 	w.WriteHeader(code)
+
+	c.logger.Errorf("order controller [%d]: %s", code, err)
 
 	if err = json.NewEncoder(w).Encode(errJSON); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
