@@ -111,6 +111,7 @@ func (s *AccrualService) run(ctx context.Context) {
 			if !open {
 				return
 			}
+
 			if err := s.limiter.Wait(ctx); err != nil {
 				if !errors.Is(err, context.Canceled) {
 					s.logger.Errorf("wait limiter: %v", err)
