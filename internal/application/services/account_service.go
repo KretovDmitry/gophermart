@@ -40,12 +40,7 @@ func NewAccountService(
 var _ interfaces.AccountService = (*AccountService)(nil)
 
 func (s *AccountService) GetAccount(ctx context.Context, id user.ID) (*entities.Account, error) {
-	account, err := s.accountRepo.GetAccountByUserID(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-
-	return account, nil
+	return s.accountRepo.GetAccountByUserID(ctx, id)
 }
 
 func (s *AccountService) Withdraw(ctx context.Context, params *params.Withdraw) error {
@@ -74,10 +69,5 @@ func (s *AccountService) Withdraw(ctx context.Context, params *params.Withdraw) 
 }
 
 func (s *AccountService) GetWithdrawals(ctx context.Context, id user.ID) ([]*entities.Withdrawal, error) {
-	withdrawals, err := s.accountRepo.GetWithdrawalsByUserID(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-
-	return withdrawals, nil
+	return s.accountRepo.GetWithdrawalsByUserID(ctx, id)
 }

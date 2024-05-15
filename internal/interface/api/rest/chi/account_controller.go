@@ -14,16 +14,20 @@ import (
 	"github.com/KretovDmitry/gophermart/internal/interface/api/rest/header"
 	"github.com/KretovDmitry/gophermart/internal/interface/api/rest/request"
 	"github.com/KretovDmitry/gophermart/internal/interface/api/rest/response"
+	"github.com/KretovDmitry/gophermart/pkg/logger"
 	"github.com/go-chi/chi/v5"
 	"github.com/shopspring/decimal"
 )
 
 type AccountController struct {
 	service interfaces.AccountService
+	logger  logger.Logger
 }
 
 // NewAccountController registers http.Handlers with additional options.
-func NewAccountController(service interfaces.AccountService, options ChiServerOptions) {
+func NewAccountController(
+	service interfaces.AccountService, logger logger.Logger, options ChiServerOptions,
+) {
 	r := options.BaseRouter
 
 	if r == nil {
@@ -32,6 +36,7 @@ func NewAccountController(service interfaces.AccountService, options ChiServerOp
 
 	c := AccountController{
 		service: service,
+		logger:  logger,
 	}
 
 	r.Group(func(r chi.Router) {
@@ -184,6 +189,8 @@ func (c *AccountController) ErrorHandlerFunc(w http.ResponseWriter, _ *http.Requ
 	}
 
 	w.WriteHeader(code)
+
+	c.logger.Errorf("account controller [%d]: %s", code, err)
 
 	if err = json.NewEncoder(w).Encode(errJSON); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

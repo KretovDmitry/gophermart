@@ -6,7 +6,7 @@ import (
 )
 
 // IsTextPlainContentType returns true if the content type of the
-// request is text/plain.
+// HTTP request is text/plain.
 func IsTextPlainContentType(r *http.Request) bool {
 	contentType := r.Header.Get("Content-Type")
 	contentType = strings.ToLower(strings.TrimSpace(contentType))
@@ -17,7 +17,7 @@ func IsTextPlainContentType(r *http.Request) bool {
 }
 
 // IsApplicationJSONContentType returns true if the content type of the
-// request is application/json.
+// HTTP request is application/json.
 func IsApplicationJSONContentType(r *http.Request) bool {
 	contentType := r.Header.Get("Content-Type")
 	contentType = strings.ToLower(strings.TrimSpace(contentType))

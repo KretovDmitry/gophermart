@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/KretovDmitry/gophermart/internal/application/errs"
+	"github.com/KretovDmitry/gophermart/internal/application/interfaces"
 	"github.com/KretovDmitry/gophermart/internal/config"
 	"github.com/KretovDmitry/gophermart/internal/domain/entities"
 	"github.com/KretovDmitry/gophermart/internal/domain/entities/user"
@@ -47,6 +48,8 @@ func NewAuthService(
 		config:      config,
 	}, nil
 }
+
+var _ interfaces.AuthService = (*AuthService)(nil)
 
 // Registr user.
 func (s *AuthService) Register(ctx context.Context, login, password string) (user.ID, error) {
@@ -147,6 +150,7 @@ func (s *AuthService) GetUserFromToken(ctx context.Context, tokenString string) 
 	if err != nil {
 		return nil, err
 	}
+
 	// Return the user.
 	return user, nil
 }

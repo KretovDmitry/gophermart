@@ -19,7 +19,9 @@ type Operation struct {
 	Sum    decimal.Decimal
 }
 
-func NewWithdrawOperation(id user.ID, order OrderNumber, sum decimal.Decimal) *Operation {
+func NewWithdrawOperation(
+	id user.ID, order OrderNumber, sum decimal.Decimal,
+) *Operation {
 	return &Operation{
 		UserID: id,
 		Type:   WITHDRAWAL,

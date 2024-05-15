@@ -19,7 +19,7 @@ type (
 		HTTPServer HTTPServer `yaml:"http_server"`
 		JWT        JWT        `yaml:"jwt"`
 		Logger     Logger     `yaml:"logger"`
-		// Cost to hash the password . Must be grater than 3.
+		// Cost to hash the password. Must be grater than 3.
 		PasswordHashCost int `yaml:"password_hash_cost" env-default:"14"`
 		// Allows set env var locally to not run migrations.
 		MigrateOnStart bool `yaml:"migrate_on_start" env:"MIGRATE_ON_START"`

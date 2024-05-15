@@ -60,9 +60,7 @@ const (
 
 // New creates a new logger using the default configuration.
 func New(config *config.Config) *Log {
-	var once sync.Once
-
-	once.Do(func() {
+	sync.OnceFunc(func() {
 		stdout := zapcore.AddSync(os.Stdout)
 
 		file := zapcore.AddSync(&lumberjack.Logger{
